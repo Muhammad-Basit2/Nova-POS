@@ -1,0 +1,19 @@
+{
+  "name": "nova-pos",
+  "version": "1.0.0",
+  "description": "Nova POS – Fast, offline Point of Sale & Inventory Management desktop application",
+  "main": "src/main/main.js",
+  "author": "Nova POS Team",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

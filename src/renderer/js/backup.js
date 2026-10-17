@@ -1,0 +1,54 @@
+/* ============================================================
+ *  Nova POS – Database Backup & Restore Logic
+ *  src/renderer/js/backup.js
+ * ============================================================ */
+
+import { toast, fmt } from './app.js';
+
+const api = window.novaAPI;
+const $ = (sel) => document.querySelector(sel);
+
+async function refresh() {
+  const list = await api.backup.list();
+  const body = $('#backupBody');
+  body.innerHTML = '';
+  $('#backupEmpty').classList.toggle('hidden', list.length > 0);
+
+  list.forEach(b => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${b.name}</td>
+      <td>${new Date(b.created).toLocaleString()}</td>
+      <td class="num">${(b.size / 1024).toFixed(1)} KB</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function createBackup() {
+  const res = await api.backup.create();
+  if (res.success) {
+    toast(`Backup created successfully`);
+    refresh();
+  } else {
+    toast(`Backup failed: ${res.message}`, true);
+  }
+}
+
+async function restoreBackup() {
+  if (!confirm('WARNING: Restoring a backup will overwrite all current data. Continue?')) return;
+  const res = await api.backup.restore();
+  if (res.success) {
+    toast(res.message);
+  } else if (res.message !== 'Cancelled') {
+    toast(`Restore failed: ${res.message}`, true);
+  }
+}
+
+function init() {
+  $('#backupCreateBtn').addEventListener('click', createBackup);
+  $('#backupRestoreBtn').addEventListener('click', restoreBackup);
+  refresh();
+}
+
+export const initBackup = { init, refresh };

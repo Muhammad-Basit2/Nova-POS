@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <title>Nova POS</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">⚡</span>
+      <h1>Nova <span class="accent">POS</span></h1>
+    </div>
+    <div class="store-info" id="storeInfo">Nova POS Store</div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <nav class="tabs" id="navTabs">
+    <button class="tab active" data-view="dashboard">📊 Dashboard</button>
+    <button class="tab" data-view="pos">🛒 POS</button>
+    <button class="tab" data-view="inventory">📦 Inventory</button>
+    <button class="tab" data-view="ledger">📒 Ledger</button>
+    <button class="tab" data-view="sales">🧾 Sales History</button>
+    <button class="tab" data-view="backup">💾 Backup</button>
+    <button class="tab" data-view="settings">⚙️ Settings</button>
+  </nav>
+
+  <main class="views" id="views">
+
+    <section class="view active" id="view-dashboard">
+      <div class="dashboard-grid">
+        <div class="card stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <h3>Today's Sales</h3>
+            <p id="dashTodaySales" class="stat-value">0.00</p>
+            <span id="dashTxCount" class="stat-sub">0 transactions today</span>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-info">
+            <h3>Today's Profit</h3>
+            <p id="dashTodayProfit" class="stat-value">0.00</p>
+            <span class="stat-sub">Estimated gross profit</span>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon">⚠️</div>
+          <div class="stat-info">
+            <h3>Low Stock Items</h3>
+            <p id="dashLowStockCount" class="stat-value">0</p>
+            <span class="stat-sub">Items need reordering</span>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-info">
+            <h3>Active Items</h3>
+            <p id="dashTotalItems" class="stat-value">0</p>
+            <span class="stat-sub">Total catalog items</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top: 4px;">
+        <h3>⚠️ Low Stock Alerts</h3>
+        <div class="table-wrap">
+          <table class="table" id="dashLowStockTable">
+            <thead>
+              <tr><th>Barcode</th><th>Name</th><th>Category</th><th>Current Stock</th><th>Min Stock</th><th>Unit</th></tr>
+            </thead>
+            <tbody id="dashLowStockBody"></tbody>
+          </table>
+          <div id="dashLowStockEmpty" class="empty-state">No low stock items — all inventory levels are healthy!</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-pos">
+      <div class="pos-grid">
+        <div class="pos-left card">
+          <div class="pos-toolbar">
+            <input type="text" id="barcodeInput" class="input" placeholder="Scan barcode or search item… (F2)" autocomplete="off" />
+            <div id="searchResults" class="search-results hidden"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="cartTable">
+              <thead>
+                <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th></th></tr>
+              </thead>
+              <tbody id="cartBody"></tbody>
+            </table>
+            <div id="cartEmpty" class="empty-state">Cart is empty — scan or click an item</div>
+          </div>
+        </div>
+
+        <div class="pos-catalog card">
+          <div class="toolbar" style="margin-bottom: 10px;">
+            <input type="text" id="posCatalogSearch" class="input" placeholder="Search catalog items…" />
+            <select id="posCategoryFilter" class="input small"><option value="">All Categories</option></select>
+          </div>
+          <div class="pos-products-wrap">
+            <div id="posProductsGrid" class="pos-products-grid"></div>
+            <div id="posProductsEmpty" class="empty-state hidden">No items found in catalog</div>
+          </div>
+        </div>
+
+        <div class="pos-right card">
+          <h3>Checkout</h3>
+          <div class="totals">
+            <div class="row"><span>Subtotal</span><span id="subtotal">0.00</span></div>
+            <div class="row">
+              <span>Discount</span>
+              <input type="number" id="discountInput" class="input small" value="0" min="0" />
+            </div>
+            <div class="row grand"><span>TOTAL</span><span id="grandTotal">0.00</span></div>
+            <div class="row">
+              <span>Amount Paid</span>
+              <input type="number" id="amountPaidInput" class="input small" value="0" min="0" />
+            </div>
+            <div class="row"><span>Change</span><span id="changeDue">0.00</span></div>
+          </div>
+          <select id="customerSelect" class="input"><option value="">Walk-in Customer</option></select>
+          <select id="paymentMethod" class="input">
+            <option value="cash">Cash</option>
+            <option value="credit">Credit</option>
+          </select>
+          <button id="completeSaleBtn" class="btn primary block">✅ Complete Sale (F9)</button>
+          <button id="clearCartBtn" class="btn danger block">🗑 Clear Cart (F8)</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-inventory">
+      <div class="toolbar">
+        <input type="text" id="inventorySearch" class="input" placeholder="Search items…" />
+        <select id="categoryFilter" class="input small"><option value="">All Categories</option></select>
+        <button id="addItemBtn" class="btn primary">➕ Add Item</button>
+        <button id="importExcelBtn" class="btn">📥 Import Excel</button>
+        <button id="exportExcelBtn" class="btn">📤 Export Excel</button>
+      </div>
+      <div class="table-wrap card">
+        <table class="table" id="inventoryTable">
+          <thead>
+            <tr><th>Barcode</th><th>Name</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+        <div id="inventoryEmpty" class="empty-state hidden">No items found</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-ledger">
+      <div class="toolbar">
+        <select id="ledgerType" class="input small">
+          <option value="customer">Customers</option>
+          <option value="vendor">Vendors</option>
+        </select>
+        <button id="addEntityBtn" class="btn primary">➕ Add</button>
+        <button id="addTransactionBtn" class="btn">💵 Add Transaction</button>
+      </div>
+      <div class="ledger-grid">
+        <div class="table-wrap card">
+          <table class="table" id="entityTable">
+            <thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Actions</th></tr></thead>
+            <tbody id="entityBody"></tbody>
+          </table>
+        </div>
+        <div class="card" id="ledgerDetail">
+          <h3 id="ledgerDetailTitle">Select an entry</h3>
+          <table class="table">
+            <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-sales">
+      <div class="toolbar">
+        <input type="date" id="salesFrom" class="input small" />
+        <input type="date" id="salesTo" class="input small" />
+        <button id="salesFilterBtn" class="btn primary">Filter</button>
+        <button id="salesRefreshBtn" class="btn">Refresh</button>
+      </div>
+      <div class="table-wrap card">
+        <table class="table" id="salesTable">
+          <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Total</th><th>Paid</th><th>Method</th><th></th></tr></thead>
+          <tbody id="salesBody"></tbody>
+        </table>
+        <div id="salesEmpty" class="empty-state hidden">No sales found</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-backup">
+      <div class="backup-actions card">
+        <button id="backupCreateBtn" class="btn primary">💾 Create Backup</button>
+        <button id="backupRestoreBtn" class="btn warning">♻️ Restore from Backup</button>
+      </div>
+      <div class="table-wrap card">
+        <table class="table" id="backupTable">
+          <thead><tr><th>File</th><th>Created</th><th>Size</th></tr></thead>
+          <tbody id="backupBody"></tbody>
+        </table>
+        <div id="backupEmpty" class="empty-state hidden">No backups yet</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="card settings-form" id="settingsForm">
+        <h3>Store Settings</h3>
+        <label>Store Name<input class="input" data-setting="store_name" /></label>
+        <label>Store Phone<input class="input" data-setting="store_phone" /></label>
+        <label>Store Address<input class="input" data-setting="store_address" /></label>
+        <label>Currency<input class="input" data-setting="currency" /></label>
+        <label>Tax Rate (%)<input class="input" type="number" data-setting="tax_rate" /></label>
+        <label>Invoice Prefix<input class="input" data-setting="invoice_prefix" /></label>
+        <label>Receipt Footer<textarea class="input" data-setting="receipt_footer" rows="2"></textarea></label>
+        <button id="saveSettingsBtn" class="btn primary block">💾 Save Settings</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal hidden" id="modal">
+    <div class="modal-content card" id="modalContent"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
