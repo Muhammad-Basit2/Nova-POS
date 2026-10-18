@@ -343,6 +343,42 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       .sort((a, b) => b.created - a.created);
   });
 
+  ipcMain.handle('backup:export', async (_e, filePath) => {
+    if (!filePath) return { success: false, message: 'No backup file specified' };
+    const { canceled, filePath: savePath } = await dialog.showSaveDialog({
+      title: 'Export Database Backup',
+      defaultPath: path.basename(filePath),
+      filters: [{ name: 'Database Backup', extensions: ['db'] }]
+    });
+    if (canceled || !savePath) return { success: false, message: 'Cancelled' };
+    try {
+      fs.copyFileSync(filePath, savePath);
+      return { success: true, message: 'Backup exported successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  ipcMain.handle('backup:import', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Import Database Backup',
+      filters: [{ name: 'Database Backup', extensions: ['db'] }],
+      properties: ['openFile']
+    });
+    if (canceled || !filePaths.length) return { success: false, message: 'Cancelled' };
+    const backupDir = path.join(app.getPath('userData'), 'backups');
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    const srcPath = filePaths[0];
+    const fileName = path.basename(srcPath);
+    const destPath = path.join(backupDir, fileName);
+    try {
+      fs.copyFileSync(srcPath, destPath);
+      return { success: true, message: 'Backup imported successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
   /* ===========================================================
    *  SETTINGS
    * =========================================================== */

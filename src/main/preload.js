@@ -68,8 +68,10 @@ contextBridge.exposeInMainWorld('novaAPI', {
   /* ---- Backup / Restore ------------------------------------ */
   backup: {
     create:   ()         => ipcRenderer.invoke('backup:create'),
-    restore:  ()         => ipcRenderer.invoke('backup:restore'),
+    restore:  (filePath) => ipcRenderer.invoke('backup:restore', filePath),
     list:     ()         => ipcRenderer.invoke('backup:list'),
+    export:   (filePath) => ipcRenderer.invoke('backup:export', filePath),
+    import:   ()         => ipcRenderer.invoke('backup:import'),
   },
 
   /* ---- Settings -------------------------------------------- */

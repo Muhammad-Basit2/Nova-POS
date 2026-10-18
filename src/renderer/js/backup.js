@@ -22,7 +22,10 @@ async function refresh() {
       <td>${new Date(b.created).toLocaleString()}</td>
       <td class="num">${(b.size / 1024).toFixed(1)} KB</td>
       <td>
-        <button class="btn small warning" data-restore-path="${b.path}">♻️ Restore</button>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn small warning" data-restore-path="${b.path}">♻️ Restore</button>
+          <button class="btn small" data-export-path="${b.path}">📤 Export</button>
+        </div>
       </td>
     `;
     body.appendChild(tr);
@@ -49,12 +52,38 @@ async function restoreBackup(filePath) {
   }
 }
 
+async function exportBackup(filePath) {
+  if (!filePath) {
+    toast('Please select a backup from the list to export', true);
+    return;
+  }
+  const res = await api.backup.export(filePath);
+  if (res.success) {
+    toast(res.message);
+  } else if (res.message !== 'Cancelled') {
+    toast(`Export failed: ${res.message}`, true);
+  }
+}
+
+async function importBackup() {
+  const res = await api.backup.import();
+  if (res.success) {
+    toast(res.message);
+    refresh();
+  } else if (res.message !== 'Cancelled') {
+    toast(`Import failed: ${res.message}`, true);
+  }
+}
+
 function init() {
   $('#backupCreateBtn')?.addEventListener('click', createBackup);
   $('#backupRestoreBtn')?.addEventListener('click', () => restoreBackup());
+  $('#backupImportBtn')?.addEventListener('click', importBackup);
   $('#backupTable')?.addEventListener('click', (e) => {
-    const path = e.target.dataset.restorePath;
-    if (path) restoreBackup(path);
+    const restorePath = e.target.dataset.restorePath;
+    const exportPath = e.target.dataset.exportPath;
+    if (restorePath) restoreBackup(restorePath);
+    if (exportPath) exportBackup(exportPath);
   });
   refresh();
 }
