@@ -197,6 +197,7 @@
         <div class="settings-subtabs">
           <button class="settings-tab active" data-settings-tab="general">⚙️ Store Settings</button>
           <button class="settings-tab" data-settings-tab="backup">💾 Backup & Restore</button>
+          <button class="settings-tab" data-settings-tab="data">🗑️ Data Management</button>
         </div>
         <div class="settings-panels">
           <div class="settings-panel active" id="settings-panel-general">
@@ -224,6 +225,44 @@
                 <tbody id="backupBody"></tbody>
               </table>
               <div id="backupEmpty" class="empty-state hidden">No backups yet</div>
+            </div>
+          </div>
+          <div class="settings-panel hidden" id="settings-panel-data">
+            <div class="card" style="border-color: var(--danger); max-width: 520px;">
+              <h3 style="color: var(--danger); margin-bottom: 8px;">⚠️ Danger Zone — Data Management</h3>
+              <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 14px;">
+                Permanently delete specific business data or reset the application database. This action cannot be undone. Make sure you take a backup first!
+              </p>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                  <div>
+                    <strong>Clear Sales History</strong>
+                    <div style="font-size: 12px; color: var(--text-dim);">Delete all past invoices and sale items</div>
+                  </div>
+                  <button id="clearSalesBtn" class="btn danger small">Clear Sales</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                  <div>
+                    <strong>Clear Inventory</strong>
+                    <div style="font-size: 12px; color: var(--text-dim);">Delete all catalog items</div>
+                  </div>
+                  <button id="clearInventoryBtn" class="btn danger small">Clear Inventory</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                  <div>
+                    <strong>Clear Ledger & Contacts</strong>
+                    <div style="font-size: 12px; color: var(--text-dim);">Delete all customers, vendors, and transactions</div>
+                  </div>
+                  <button id="clearLedgerBtn" class="btn danger small">Clear Ledger</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
+                  <div>
+                    <strong style="color: var(--danger);">Reset All Business Data</strong>
+                    <div style="font-size: 12px; color: var(--text-dim);">Clear sales, inventory, ledger, customers, and vendors</div>
+                  </div>
+                  <button id="clearAllBtn" class="btn danger">🗑️ Reset All Data</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

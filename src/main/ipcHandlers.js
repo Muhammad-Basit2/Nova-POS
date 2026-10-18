@@ -380,6 +380,53 @@ function registerIpcHandlers(ipcMain, db, dialog) {
   });
 
   /* ===========================================================
+   *  DATA MANAGEMENT / CLEANUP
+   * =========================================================== */
+  ipcMain.handle('data:clearSales', () => {
+    try {
+      db.prepare('DELETE FROM sale_items').run();
+      db.prepare('DELETE FROM sales').run();
+      return { success: true, message: 'Sales history cleared successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  ipcMain.handle('data:clearInventory', () => {
+    try {
+      db.prepare('DELETE FROM items').run();
+      return { success: true, message: 'Inventory cleared successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  ipcMain.handle('data:clearLedger', () => {
+    try {
+      db.prepare('DELETE FROM ledger_transactions').run();
+      db.prepare('DELETE FROM customers').run();
+      db.prepare('DELETE FROM vendors').run();
+      return { success: true, message: 'Ledger, customers and vendors cleared successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  ipcMain.handle('data:clearAll', () => {
+    try {
+      db.prepare('DELETE FROM sale_items').run();
+      db.prepare('DELETE FROM sales').run();
+      db.prepare('DELETE FROM items').run();
+      db.prepare('DELETE FROM ledger_transactions').run();
+      db.prepare('DELETE FROM customers').run();
+      db.prepare('DELETE FROM vendors').run();
+      return { success: true, message: 'All business data cleared successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  /* ===========================================================
    *  SETTINGS
    * =========================================================== */
   ipcMain.handle('settings:get', (_e, key) => {

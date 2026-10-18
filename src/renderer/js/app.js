@@ -8,6 +8,7 @@ import { initPOS } from './pos.js';
 import { initInventory } from './inventory.js';
 import { initLedger } from './ledger.js';
 import { initBackup } from './backup.js';
+import { initDataManagement } from './dataManagement.js';
 
 const $ = (sel) => document.querySelector(sel);
 const api = window.novaAPI;
@@ -173,6 +174,7 @@ async function boot() {
   initInventory.init();
   initLedger.init();
   initBackup.init();
+  initDataManagement.init();
 }
 
 document.addEventListener('DOMContentLoaded', boot);

@@ -74,6 +74,14 @@ contextBridge.exposeInMainWorld('novaAPI', {
     import:   ()         => ipcRenderer.invoke('backup:import'),
   },
 
+  /* ---- Data Management --------------------------------------- */
+  data: {
+    clearSales:     () => ipcRenderer.invoke('data:clearSales'),
+    clearInventory: () => ipcRenderer.invoke('data:clearInventory'),
+    clearLedger:    () => ipcRenderer.invoke('data:clearLedger'),
+    clearAll:       () => ipcRenderer.invoke('data:clearAll'),
+  },
+
   /* ---- Settings -------------------------------------------- */
   settings: {
     get:      (key)       => ipcRenderer.invoke('settings:get', key),
