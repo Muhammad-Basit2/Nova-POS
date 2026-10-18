@@ -121,10 +121,14 @@
             </div>
             <div class="row"><span>Change</span><span id="changeDue">0.00</span></div>
           </div>
-          <div class="customer-select-wrap" style="margin-bottom: 8px;">
-            <input type="text" id="customerSearchInput" class="input" placeholder="🔍 Search customer (Name / Phone)..." list="customersDatalist" />
-            <datalist id="customersDatalist"></datalist>
-            <input type="text" id="walkInNameInput" class="input small" placeholder="Walk-in Name (optional)" style="margin-top: 6px; width: 17rem;" />
+          <div class="customer-select-wrap" style="position: relative; margin-bottom: 8px;">
+            <input type="text" id="customerSearchInput" class="input" placeholder="🔍 Search customer by name or phone..." autocomplete="off" />
+            <div id="customerSearchResults" class="search-results hidden"></div>
+            <div id="selectedCustomerBadge" class="hidden" style="margin-top: 2px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; background: var(--bg); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);">
+              <span id="selectedCustomerInfo"></span>
+              <button id="clearCustomerBtn" class="btn danger small-btn" style="padding: 2px 6px;">✕</button>
+            </div>
+            <input type="text" id="walkInNameInput" class="input small" placeholder="Walk-in Name (optional)" style="margin-top: 6px; width: 100%;" />
           </div>
           <select id="paymentMethod" class="input">
             <option value="cash">Cash</option>

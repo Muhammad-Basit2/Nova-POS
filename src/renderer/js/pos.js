@@ -75,18 +75,84 @@ function setQuantity(idx, qty) {
 
 let selectedCustomerId = null;
 
+function selectCustomer(c) {
+  selectedCustomerId = c.id;
+  const inp = $('#customerSearchInput');
+  if (inp) {
+    inp.value = '';
+    inp.classList.add('hidden');
+  }
+  $('#customerSearchResults')?.classList.add('hidden');
+  const badge = $('#selectedCustomerBadge');
+  const info = $('#selectedCustomerInfo');
+  if (badge && info) {
+    info.innerHTML = `<strong>${c.name}</strong> (${c.phone || 'No phone'}) — Bal: <span style="color:${c.balance > 0 ? 'var(--accent)' : 'inherit'}">${fmt(c.balance)}</span>`;
+    badge.classList.remove('hidden');
+  }
+  const walkIn = $('#walkInNameInput');
+  if (walkIn) {
+    walkIn.value = '';
+    walkIn.classList.add('hidden');
+  }
+}
+
+function clearSelectedCustomer() {
+  selectedCustomerId = null;
+  const inp = $('#customerSearchInput');
+  if (inp) {
+    inp.value = '';
+    inp.classList.remove('hidden');
+  }
+  $('#selectedCustomerBadge')?.classList.add('hidden');
+  const walkIn = $('#walkInNameInput');
+  if (walkIn) {
+    walkIn.value = '';
+    walkIn.classList.remove('hidden');
+    walkIn.disabled = false;
+  }
+}
+
 function clearCart() {
   cart = [];
   $('#discountInput').value = 0;
   $('#amountPaidInput').value = 0;
-  if ($('#customerSearchInput')) $('#customerSearchInput').value = '';
-  if ($('#walkInNameInput')) {
-    $('#walkInNameInput').value = '';
-    $('#walkInNameInput').disabled = false;
-  }
-  selectedCustomerId = null;
+  clearSelectedCustomer();
   renderCart();
   focusBarcode();
+}
+
+let customerSearchTimer = null;
+function handleCustomerSearch(term) {
+  clearTimeout(customerSearchTimer);
+  const box = $('#customerSearchResults');
+  if (!box) return;
+  if (!term) {
+    box.classList.add('hidden');
+    selectedCustomerId = null;
+    return;
+  }
+  customerSearchTimer = setTimeout(() => {
+    const matches = customers.filter(c => 
+      c.name.toLowerCase().includes(term) || 
+      (c.phone && String(c.phone).toLowerCase().includes(term))
+    );
+    box.innerHTML = '';
+    if (!matches.length) {
+      box.innerHTML = `<div class="search-result-item" style="color:var(--text-dim); cursor:default;">No customers found</div>`;
+      box.classList.remove('hidden');
+      return;
+    }
+    matches.slice(0, 10).forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'search-result-item';
+      div.innerHTML = `<span><strong>${c.name}</strong> (${c.phone || 'No phone'})</span><span style="color:${c.balance > 0 ? 'var(--accent)' : 'inherit'}">Bal: ${fmt(c.balance)}</span>`;
+      div.addEventListener('click', () => {
+        selectCustomer(c);
+      });
+      box.appendChild(div);
+    });
+    box.classList.remove('hidden');
+  }, 150);
 }
 
 function focusBarcode() { $('#barcodeInput')?.focus(); }
@@ -228,9 +294,6 @@ async function viewSale(id) {
 
 async function loadCustomers() {
   customers = await api.customers.getAll();
-  const sel = $('#customerSelect');
-  sel.innerHTML = '<option value="">Walk-in Customer</option>' +
-    customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   loadCatalog();
 }
 
@@ -298,30 +361,15 @@ function init() {
   });
 
   $('#customerSearchInput')?.addEventListener('input', (e) => {
-    const val = e.target.value.trim().toLowerCase();
-    if (!val) {
-      selectedCustomerId = null;
-      if ($('#walkInNameInput')) $('#walkInNameInput').disabled = false;
-      return;
-    }
-    const matched = customers.find(c => 
-      c.name.toLowerCase() === val || 
-      (c.phone && c.phone.toLowerCase() === val) ||
-      `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}`.toLowerCase() === val ||
-      c.name.toLowerCase().includes(val) ||
-      (c.phone && c.phone.includes(val))
-    );
-    if (matched) {
-      selectedCustomerId = matched.id;
-      if ($('#walkInNameInput')) {
-        $('#walkInNameInput').value = '';
-        $('#walkInNameInput').disabled = true;
-      }
-    } else {
-      selectedCustomerId = null;
-      if ($('#walkInNameInput')) {
-        $('#walkInNameInput').disabled = false;
-      }
+    handleCustomerSearch(e.target.value.trim().toLowerCase());
+  });
+  $('#clearCustomerBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    clearSelectedCustomer();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.customer-select-wrap')) {
+      $('#customerSearchResults')?.classList.add('hidden');
     }
   });
   $('#amountPaidInput').addEventListener('input', recalcChange);
