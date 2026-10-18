@@ -22,7 +22,6 @@
     <button class="tab" data-view="inventory">📦 Inventory</button>
     <button class="tab" data-view="ledger">📒 Ledger</button>
     <button class="tab" data-view="sales">🧾 Sales History</button>
-    <button class="tab" data-view="backup">💾 Backup</button>
     <button class="tab" data-view="settings">⚙️ Settings</button>
   </nav>
 
@@ -193,31 +192,40 @@
       </div>
     </section>
 
-    <section class="view" id="view-backup">
-      <div class="backup-actions card">
-        <button id="backupCreateBtn" class="btn primary">💾 Create Backup</button>
-        <button id="backupRestoreBtn" class="btn warning">♻️ Restore from Backup</button>
-      </div>
-      <div class="table-wrap card">
-        <table class="table" id="backupTable">
-          <thead><tr><th>File</th><th>Created</th><th>Size</th></tr></thead>
-          <tbody id="backupBody"></tbody>
-        </table>
-        <div id="backupEmpty" class="empty-state hidden">No backups yet</div>
-      </div>
-    </section>
-
     <section class="view" id="view-settings">
-      <div class="card settings-form" id="settingsForm">
-        <h3>Store Settings</h3>
-        <label>Store Name<input class="input" data-setting="store_name" /></label>
-        <label>Store Phone<input class="input" data-setting="store_phone" /></label>
-        <label>Store Address<input class="input" data-setting="store_address" /></label>
-        <label>Currency<input class="input" data-setting="currency" /></label>
-        <label>Tax Rate (%)<input class="input" type="number" data-setting="tax_rate" /></label>
-        <label>Invoice Prefix<input class="input" data-setting="invoice_prefix" /></label>
-        <label>Receipt Footer<textarea class="input" data-setting="receipt_footer" rows="2"></textarea></label>
-        <button id="saveSettingsBtn" class="btn primary block">💾 Save Settings</button>
+      <div class="settings-layout">
+        <div class="settings-subtabs">
+          <button class="settings-tab active" data-settings-tab="general">⚙️ Store Settings</button>
+          <button class="settings-tab" data-settings-tab="backup">💾 Backup & Restore</button>
+        </div>
+        <div class="settings-panels">
+          <div class="settings-panel active" id="settings-panel-general">
+            <div class="card settings-form" id="settingsForm">
+              <h3>Store Settings</h3>
+              <label>Store Name<input class="input" data-setting="store_name" /></label>
+              <label>Store Phone<input class="input" data-setting="store_phone" /></label>
+              <label>Store Address<input class="input" data-setting="store_address" /></label>
+              <label>Currency<input class="input" data-setting="currency" /></label>
+              <label>Tax Rate (%)<input class="input" type="number" data-setting="tax_rate" /></label>
+              <label>Invoice Prefix<input class="input" data-setting="invoice_prefix" /></label>
+              <label>Receipt Footer<textarea class="input" data-setting="receipt_footer" rows="2"></textarea></label>
+              <button id="saveSettingsBtn" class="btn primary block">💾 Save Settings</button>
+            </div>
+          </div>
+          <div class="settings-panel hidden" id="settings-panel-backup">
+            <div class="backup-actions card">
+              <button id="backupCreateBtn" class="btn primary">💾 Create Backup</button>
+              <button id="backupRestoreBtn" class="btn warning">♻️ Restore from Backup</button>
+            </div>
+            <div class="table-wrap card">
+              <table class="table" id="backupTable">
+                <thead><tr><th>File</th><th>Created</th><th>Size</th><th>Actions</th></tr></thead>
+                <tbody id="backupBody"></tbody>
+              </table>
+              <div id="backupEmpty" class="empty-state hidden">No backups yet</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>

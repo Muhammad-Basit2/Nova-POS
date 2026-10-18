@@ -11,8 +11,9 @@ const $ = (sel) => document.querySelector(sel);
 async function refresh() {
   const list = await api.backup.list();
   const body = $('#backupBody');
+  if (!body) return;
   body.innerHTML = '';
-  $('#backupEmpty').classList.toggle('hidden', list.length > 0);
+  $('#backupEmpty')?.classList.toggle('hidden', list.length > 0);
 
   list.forEach(b => {
     const tr = document.createElement('tr');
@@ -20,6 +21,9 @@ async function refresh() {
       <td>${b.name}</td>
       <td>${new Date(b.created).toLocaleString()}</td>
       <td class="num">${(b.size / 1024).toFixed(1)} KB</td>
+      <td>
+        <button class="btn small warning" data-restore-path="${b.path}">♻️ Restore</button>
+      </td>
     `;
     body.appendChild(tr);
   });
@@ -35,9 +39,9 @@ async function createBackup() {
   }
 }
 
-async function restoreBackup() {
+async function restoreBackup(filePath) {
   if (!confirm('WARNING: Restoring a backup will overwrite all current data. Continue?')) return;
-  const res = await api.backup.restore();
+  const res = await api.backup.restore(filePath);
   if (res.success) {
     toast(res.message);
   } else if (res.message !== 'Cancelled') {
@@ -46,8 +50,12 @@ async function restoreBackup() {
 }
 
 function init() {
-  $('#backupCreateBtn').addEventListener('click', createBackup);
-  $('#backupRestoreBtn').addEventListener('click', restoreBackup);
+  $('#backupCreateBtn')?.addEventListener('click', createBackup);
+  $('#backupRestoreBtn')?.addEventListener('click', () => restoreBackup());
+  $('#backupTable')?.addEventListener('click', (e) => {
+    const path = e.target.dataset.restorePath;
+    if (path) restoreBackup(path);
+  });
   refresh();
 }
 

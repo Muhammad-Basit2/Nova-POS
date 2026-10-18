@@ -311,16 +311,20 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     }
   });
 
-  ipcMain.handle('backup:restore', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: 'Restore Database Backup',
-      filters: [{ name: 'Database Backup', extensions: ['db'] }],
-      properties: ['openFile']
-    });
-    if (canceled || !filePaths.length) return { success: false, message: 'Cancelled' };
+  ipcMain.handle('backup:restore', async (_e, filePath) => {
+    let targetPath = filePath;
+    if (!targetPath) {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Restore Database Backup',
+        filters: [{ name: 'Database Backup', extensions: ['db'] }],
+        properties: ['openFile']
+      });
+      if (canceled || !filePaths.length) return { success: false, message: 'Cancelled' };
+      targetPath = filePaths[0];
+    }
     try {
       db.close();
-      fs.copyFileSync(filePaths[0], getDbPath());
+      fs.copyFileSync(targetPath, getDbPath());
       return { success: true, message: 'Database restored. Please restart the application.' };
     } catch (err) {
       return { success: false, message: err.message };

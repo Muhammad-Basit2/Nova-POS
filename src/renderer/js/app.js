@@ -53,22 +53,43 @@ const viewInitializers = {
   inventory:  () => initInventory.refresh?.(),
   ledger:     () => initLedger.refresh?.(),
   sales:      () => initPOS.loadSalesHistory?.(),
-  backup:     () => initBackup.refresh?.(),
   settings:   () => loadSettingsForm(),
 };
 
-export function switchView(name) {
+export function switchSettingsTab(tabName) {
+  document.querySelectorAll('.settings-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.settingsTab === tabName));
+  document.querySelectorAll('.settings-panel').forEach(p => {
+    const isActive = p.id === `settings-panel-${tabName}`;
+    p.classList.toggle('hidden', !isActive);
+    p.classList.toggle('active', isActive);
+  });
+  if (tabName === 'backup') {
+    initBackup.refresh?.();
+  }
+}
+
+export function switchView(name, subTab) {
   document.querySelectorAll('.tab').forEach(t =>
     t.classList.toggle('active', t.dataset.view === name));
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('active', v.id === `view-${name}`));
-  viewInitializers[name]?.();
+  if (name === 'settings') {
+    loadSettingsForm();
+    switchSettingsTab(subTab || 'general');
+  } else {
+    viewInitializers[name]?.();
+  }
 }
 
 function initRouter() {
   $('#navTabs').addEventListener('click', (e) => {
     const tab = e.target.closest('.tab');
     if (tab) switchView(tab.dataset.view);
+  });
+  document.addEventListener('click', (e) => {
+    const st = e.target.closest('.settings-tab');
+    if (st) switchSettingsTab(st.dataset.settingsTab);
   });
 }
 
@@ -126,7 +147,7 @@ function initShortcuts() {
       case 'F3': e.preventDefault(); switchView('inventory'); break;
       case 'F4': e.preventDefault(); switchView('ledger'); break;
       case 'F5': e.preventDefault(); switchView('sales'); break;
-      case 'F6': e.preventDefault(); switchView('backup'); break;
+      case 'F6': e.preventDefault(); switchView('settings', 'backup'); break;
       case 'F8': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.clearCart?.(); } break;
       case 'F9': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.completeSale?.(); } break;
     }
