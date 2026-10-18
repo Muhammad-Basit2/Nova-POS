@@ -6,7 +6,8 @@
 import { initDashboard } from './dashboard.js';
 import { initPOS } from './pos.js';
 import { initInventory } from './inventory.js';
-import { initLedger } from './ledger.js';
+import { initCustomers } from './customers.js';
+import { initVendors } from './vendors.js';
 import { initBackup } from './backup.js';
 import { initDataManagement } from './dataManagement.js';
 
@@ -52,7 +53,8 @@ const viewInitializers = {
   dashboard:  () => initDashboard.refresh?.(),
   pos:        () => initPOS.refresh?.(),
   inventory:  () => initInventory.refresh?.(),
-  ledger:     () => initLedger.refresh?.(),
+  customers:  () => initCustomers.refresh?.(),
+  vendors:    () => initVendors.refresh?.(),
   sales:      () => initPOS.loadSalesHistory?.(),
   settings:   () => loadSettingsForm(),
 };
@@ -146,9 +148,10 @@ function initShortcuts() {
       case 'F1': e.preventDefault(); switchView('dashboard'); break;
       case 'F2': e.preventDefault(); switchView('pos'); break;
       case 'F3': e.preventDefault(); switchView('inventory'); break;
-      case 'F4': e.preventDefault(); switchView('ledger'); break;
-      case 'F5': e.preventDefault(); switchView('sales'); break;
-      case 'F6': e.preventDefault(); switchView('settings', 'backup'); break;
+      case 'F4': e.preventDefault(); switchView('customers'); break;
+      case 'F5': e.preventDefault(); switchView('vendors'); break;
+      case 'F6': e.preventDefault(); switchView('sales'); break;
+      case 'F7': e.preventDefault(); switchView('settings', 'backup'); break;
       case 'F8': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.clearCart?.(); } break;
       case 'F9': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.completeSale?.(); } break;
     }
@@ -172,7 +175,8 @@ async function boot() {
   initDashboard.init();
   initPOS.init();
   initInventory.init();
-  initLedger.init();
+  initCustomers.init();
+  initVendors.init();
   initBackup.init();
   initDataManagement.init();
 }

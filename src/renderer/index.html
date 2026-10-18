@@ -20,7 +20,8 @@
     <button class="tab active" data-view="dashboard">📊 Dashboard</button>
     <button class="tab" data-view="pos">🛒 POS</button>
     <button class="tab" data-view="inventory">📦 Inventory</button>
-    <button class="tab" data-view="ledger">📒 Ledger</button>
+    <button class="tab" data-view="customers">👥 Customers</button>
+    <button class="tab" data-view="vendors">🏢 Vendors</button>
     <button class="tab" data-view="sales">🧾 Sales History</button>
     <button class="tab" data-view="settings">⚙️ Settings</button>
   </nav>
@@ -120,7 +121,11 @@
             </div>
             <div class="row"><span>Change</span><span id="changeDue">0.00</span></div>
           </div>
-          <select id="customerSelect" class="input"><option value="">Walk-in Customer</option></select>
+          <div class="customer-select-wrap" style="margin-bottom: 8px;">
+            <input type="text" id="customerSearchInput" class="input" placeholder="🔍 Search customer (Name / Phone)..." list="customersDatalist" />
+            <datalist id="customersDatalist"></datalist>
+            <input type="text" id="walkInNameInput" class="input small" placeholder="Walk-in Name (optional)" style="margin-top: 6px; width: 17rem;" />
+          </div>
           <select id="paymentMethod" class="input">
             <option value="cash">Cash</option>
             <option value="credit">Credit</option>
@@ -150,27 +155,45 @@
       </div>
     </section>
 
-    <section class="view" id="view-ledger">
+    <section class="view" id="view-customers">
       <div class="toolbar">
-        <select id="ledgerType" class="input small">
-          <option value="customer">Customers</option>
-          <option value="vendor">Vendors</option>
-        </select>
-        <button id="addEntityBtn" class="btn primary">➕ Add</button>
-        <button id="addTransactionBtn" class="btn">💵 Add Transaction</button>
+        <button id="addCustomerBtn" class="btn primary">➕ Add Customer</button>
+        <button id="addCustomerTxBtn" class="btn">💵 Add Transaction</button>
       </div>
       <div class="ledger-grid">
         <div class="table-wrap card">
-          <table class="table" id="entityTable">
+          <table class="table" id="customerEntityTable">
             <thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Actions</th></tr></thead>
-            <tbody id="entityBody"></tbody>
+            <tbody id="customerEntityBody"></tbody>
           </table>
         </div>
-        <div class="card" id="ledgerDetail">
-          <h3 id="ledgerDetailTitle">Select an entry</h3>
+        <div class="card" id="customerLedgerDetail">
+          <h3 id="customerDetailTitle">Select a customer</h3>
           <table class="table">
             <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
-            <tbody id="ledgerBody"></tbody>
+            <tbody id="customerLedgerBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-vendors">
+      <div class="toolbar">
+        <button id="addVendorBtn" class="btn primary">➕ Add Vendor</button>
+        <button id="addVendorTxBtn" class="btn">💵 Add Transaction</button>
+      </div>
+      <div class="ledger-grid">
+        <div class="table-wrap card">
+          <table class="table" id="vendorEntityTable">
+            <thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Actions</th></tr></thead>
+            <tbody id="vendorEntityBody"></tbody>
+          </table>
+        </div>
+        <div class="card" id="vendorLedgerDetail">
+          <h3 id="vendorDetailTitle">Select a vendor</h3>
+          <table class="table">
+            <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+            <tbody id="vendorLedgerBody"></tbody>
           </table>
         </div>
       </div>

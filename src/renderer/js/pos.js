@@ -73,10 +73,18 @@ function setQuantity(idx, qty) {
   renderCart();
 }
 
+let selectedCustomerId = null;
+
 function clearCart() {
   cart = [];
   $('#discountInput').value = 0;
   $('#amountPaidInput').value = 0;
+  if ($('#customerSearchInput')) $('#customerSearchInput').value = '';
+  if ($('#walkInNameInput')) {
+    $('#walkInNameInput').value = '';
+    $('#walkInNameInput').disabled = false;
+  }
+  selectedCustomerId = null;
   renderCart();
   focusBarcode();
 }
@@ -124,7 +132,30 @@ async function completeSale() {
   const total = Math.max(subtotal - discount, 0);
   const paid = parseFloat($('#amountPaidInput').value) || 0;
   const payment_method = $('#paymentMethod').value;
-  const customer_id = $('#customerSelect').value ? Number($('#customerSelect').value) : null;
+  
+  const customerInputVal = $('#customerSearchInput')?.value.trim() || '';
+  let customer_id = selectedCustomerId;
+  let walkInName = $('#walkInNameInput')?.value.trim() || '';
+
+  if (!customer_id && customerInputVal) {
+    const found = customers.find(c => 
+      c.name.toLowerCase() === customerInputVal.toLowerCase() || 
+      (c.phone && c.phone === customerInputVal) ||
+      `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}`.toLowerCase() === customerInputVal.toLowerCase() ||
+      c.name.toLowerCase().includes(customerInputVal.toLowerCase()) ||
+      (c.phone && c.phone.includes(customerInputVal))
+    );
+    if (found) {
+      customer_id = found.id;
+    } else if (!walkInName) {
+      walkInName = customerInputVal;
+    }
+  }
+
+  let notes = '';
+  if (!customer_id && walkInName) {
+    notes = `Walk-in: ${walkInName}`;
+  }
 
   if (payment_method === 'cash' && paid < total) {
     toast('Insufficient amount paid', true);
@@ -132,9 +163,9 @@ async function completeSale() {
   }
 
   const sale = await api.sales.create({
-    items: cart, customer_id, discount,
+    items: cart, customer_id: customer_id || null, discount,
     amount_paid: payment_method === 'credit' ? 0 : paid,
-    payment_method, notes: ''
+    payment_method, notes
   });
 
   if (sale) {
@@ -155,9 +186,17 @@ async function loadSalesHistory() {
   $('#salesEmpty').classList.toggle('hidden', sales.length > 0);
   sales.forEach(s => {
     const tr = document.createElement('tr');
+    let custDisplay = s.customer_name;
+    if (!custDisplay) {
+      if (s.notes && s.notes.startsWith('Walk-in:')) {
+        custDisplay = s.notes;
+      } else {
+        custDisplay = 'Walk-in';
+      }
+    }
     tr.innerHTML = `
       <td>${s.invoice_no}</td><td>${s.created_at}</td>
-      <td>${s.customer_name || 'Walk-in'}</td>
+      <td>${custDisplay}</td>
       <td class="num">${fmt(s.total)}</td><td class="num">${fmt(s.amount_paid)}</td>
       <td>${s.payment_method}</td>
       <td><button class="btn small-btn" data-view-sale="${s.id}">View</button></td>
@@ -258,7 +297,33 @@ function init() {
     if (e.target.classList.contains('qty-input')) setQuantity(Number(e.target.dataset.idx), e.target.value);
   });
 
-  $('#discountInput').addEventListener('input', updateTotals);
+  $('#customerSearchInput')?.addEventListener('input', (e) => {
+    const val = e.target.value.trim().toLowerCase();
+    if (!val) {
+      selectedCustomerId = null;
+      if ($('#walkInNameInput')) $('#walkInNameInput').disabled = false;
+      return;
+    }
+    const matched = customers.find(c => 
+      c.name.toLowerCase() === val || 
+      (c.phone && c.phone.toLowerCase() === val) ||
+      `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}`.toLowerCase() === val ||
+      c.name.toLowerCase().includes(val) ||
+      (c.phone && c.phone.includes(val))
+    );
+    if (matched) {
+      selectedCustomerId = matched.id;
+      if ($('#walkInNameInput')) {
+        $('#walkInNameInput').value = '';
+        $('#walkInNameInput').disabled = true;
+      }
+    } else {
+      selectedCustomerId = null;
+      if ($('#walkInNameInput')) {
+        $('#walkInNameInput').disabled = false;
+      }
+    }
+  });
   $('#amountPaidInput').addEventListener('input', recalcChange);
   $('#completeSaleBtn').addEventListener('click', completeSale);
   $('#clearCartBtn').addEventListener('click', clearCart);
