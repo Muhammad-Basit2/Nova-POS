@@ -191,6 +191,342 @@ async function tryBarcodeSubmit(barcode) {
   focusBarcode();
 }
 
+async function printThermalReceipt(saleId) {
+  try {
+    const sale = await api.sales.getById(saleId);
+    const items = await api.sales.getItems(saleId);
+    const allSettings = await api.settings.getAll();
+
+    const storeName = allSettings.store_name || 'Nova POS Store';
+    const storePhone = allSettings.store_phone || '';
+    const storeAddress = allSettings.store_address || '';
+    const receiptFooter = allSettings.receipt_footer || 'Thank you for shopping with us!';
+    const curr = allSettings.currency || '';
+
+    let custDisplay = sale.customer_name;
+    if (!custDisplay) {
+      if (sale.notes && sale.notes.startsWith('Walk-in:')) {
+        custDisplay = sale.notes;
+      } else {
+        custDisplay = 'Walk-in Customer';
+      }
+    }
+
+    const itemsRows = items.map(i => `
+      <tr>
+        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+      </tr>
+      <tr>
+        <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
+        <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Receipt ${sale.invoice_no}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            width: 72mm;
+            margin: 0 auto;
+            padding: 5mm;
+            color: #000;
+            background: #fff;
+            line-height: 1.2;
+          }
+          .center { text-align: center; }
+          .right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          td { font-size: 12px; }
+          .totals-table td { padding: 2px 0; }
+          .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
+        ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
+        
+        <div class="divider"></div>
+        
+        <div><span class="bold">Invoice:</span> ${sale.invoice_no}</div>
+        <div><span class="bold">Date:</span> ${sale.created_at}</div>
+        <div><span class="bold">Customer:</span> ${custDisplay}</div>
+        <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+
+        <div class="divider"></div>
+
+        <table>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <table class="totals-table">
+          <tr>
+            <td>Subtotal:</td>
+            <td class="right">${fmt(sale.subtotal)} ${curr}</td>
+          </tr>
+          ${sale.discount > 0 ? `
+          <tr>
+            <td>Discount:</td>
+            <td class="right">-${fmt(sale.discount)} ${curr}</td>
+          </tr>` : ''}
+          <tr class="bold" style="font-size: 14px;">
+            <td>TOTAL:</td>
+            <td class="right">${fmt(sale.total)} ${curr}</td>
+          </tr>
+          <tr>
+            <td>Amount Paid:</td>
+            <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
+          </tr>
+          <tr>
+            <td>Change Due:</td>
+            <td class="right">${fmt(sale.change_due)} ${curr}</td>
+          </tr>
+        </table>
+
+        <div class="divider"></div>
+        
+        <div class="footer">
+          ${receiptFooter}<br>
+          <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+        </div>
+      </body>
+      </html>
+    `;
+
+    let printFrame = document.getElementById('thermalPrintFrame');
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'thermalPrintFrame';
+      printFrame.style.cssText = 'position: fixed; width: 80mm; height: 100vh; border: none; left: -9999px; top: 0; opacity: 0; pointer-events: none;';
+      document.body.appendChild(printFrame);
+    }
+
+    const frameDoc = printFrame.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (e) {
+        console.error('Print invocation error:', e);
+      }
+    }, 250);
+  } catch (err) {
+    console.error('Thermal print failed:', err);
+    toast('Failed to print thermal receipt', true);
+  }
+}
+
+function getCartContext() {
+  const subtotal = cart.reduce((s, ci) => s + ci.line_total, 0);
+  const discount = parseFloat($('#discountInput').value) || 0;
+  const total = Math.max(subtotal - discount, 0);
+  const paid = parseFloat($('#amountPaidInput').value) || 0;
+  const payment_method = $('#paymentMethod')?.value || 'cash';
+
+  const customerInputVal = $('#customerSearchInput')?.value.trim() || '';
+  let walkInName = $('#walkInNameInput')?.value.trim() || '';
+
+  let custDisplay = 'Walk-in Customer';
+  if (selectedCustomerId) {
+    const cust = customers.find(c => c.id === selectedCustomerId);
+    if (cust) custDisplay = `${cust.name}${cust.phone ? ' (' + cust.phone + ')' : ''}`;
+  } else if (walkInName) {
+    custDisplay = `Walk-in: ${walkInName}`;
+  } else if (customerInputVal) {
+    custDisplay = customerInputVal;
+  }
+
+  return {
+    invoice_no: 'DRAFT / PREVIEW',
+    created_at: new Date().toLocaleString(),
+    customer_name: custDisplay,
+    payment_method,
+    subtotal,
+    discount,
+    total,
+    amount_paid: paid,
+    change_due: Math.max(paid - total, 0)
+  };
+}
+
+async function printCartThermalReceipt() {
+  if (!cart.length) { toast('Cart is empty', true); return; }
+  try {
+    const sale = getCartContext();
+    const allSettings = await api.settings.getAll();
+
+    const storeName = allSettings.store_name || 'Nova POS Store';
+    const storePhone = allSettings.store_phone || '';
+    const storeAddress = allSettings.store_address || '';
+    const receiptFooter = allSettings.receipt_footer || 'Thank you for shopping with us!';
+    const curr = allSettings.currency || '';
+
+    const itemsRows = cart.map(i => `
+      <tr>
+        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+      </tr>
+      <tr>
+        <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
+        <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Receipt Draft</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            width: 72mm;
+            margin: 0 auto;
+            padding: 5mm;
+            color: #000;
+            background: #fff;
+            line-height: 1.2;
+          }
+          .center { text-align: center; }
+          .right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          td { font-size: 12px; }
+          .totals-table td { padding: 2px 0; }
+          .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
+        ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
+        
+        <div class="divider"></div>
+        
+        <div><span class="bold">Status:</span> DRAFT RECEIPT</div>
+        <div><span class="bold">Date:</span> ${sale.created_at}</div>
+        <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
+        <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+
+        <div class="divider"></div>
+
+        <table>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <table class="totals-table">
+          <tr>
+            <td>Subtotal:</td>
+            <td class="right">${fmt(sale.subtotal)} ${curr}</td>
+          </tr>
+          ${sale.discount > 0 ? `
+          <tr>
+            <td>Discount:</td>
+            <td class="right">-${fmt(sale.discount)} ${curr}</td>
+          </tr>` : ''}
+          <tr class="bold" style="font-size: 14px;">
+            <td>TOTAL:</td>
+            <td class="right">${fmt(sale.total)} ${curr}</td>
+          </tr>
+          <tr>
+            <td>Amount Paid:</td>
+            <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
+          </tr>
+          <tr>
+            <td>Change Due:</td>
+            <td class="right">${fmt(sale.change_due)} ${curr}</td>
+          </tr>
+        </table>
+
+        <div class="divider"></div>
+        
+        <div class="footer">
+          ${receiptFooter}<br>
+          <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+        </div>
+      </body>
+      </html>
+    `;
+
+    let printFrame = document.getElementById('thermalPrintFrame');
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'thermalPrintFrame';
+      printFrame.style.cssText = 'position: fixed; width: 80mm; height: 100vh; border: none; left: -9999px; top: 0; opacity: 0; pointer-events: none;';
+      document.body.appendChild(printFrame);
+    }
+
+    const frameDoc = printFrame.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (e) {
+        console.error('Print invocation error:', e);
+      }
+    }, 250);
+  } catch (err) {
+    console.error('Thermal print failed:', err);
+    toast('Failed to print thermal receipt', true);
+  }
+}
+
+function previewCartInvoice() {
+  if (!cart.length) { toast('Cart is empty', true); return; }
+  const sale = getCartContext();
+  const rows = cart.map(i => `<tr><td>${i.item_name}</td><td>${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.line_total)}</td></tr>`).join('');
+  
+  openModal(`
+    <h3>Invoice Preview (Draft)</h3>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Customer: <strong>${sale.customer_name}</strong></p>
+    <table class="table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="totals" style="margin-top:10px">
+      <div class="row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
+      ${sale.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(sale.discount)}</span></div>` : ''}
+      <div class="row grand"><span>Total</span><span>${fmt(sale.total)}</span></div>
+      <div class="row"><span>Amount Paid</span><span>${fmt(sale.amount_paid)}</span></div>
+      <div class="row"><span>Change Due</span><span>${fmt(sale.change_due)}</span></div>
+      <div class="row"><span>Payment Method</span><span>${sale.payment_method.toUpperCase()}</span></div>
+    </div>
+    <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
+      <button class="btn primary" id="previewPrintThermalBtn">🖨️ Thermal Print</button>
+      <button class="btn" id="closePreviewModal">Close</button>
+    </div>
+  `);
+  document.getElementById('closePreviewModal').addEventListener('click', closeModal);
+  document.getElementById('previewPrintThermalBtn').addEventListener('click', () => {
+    printCartThermalReceipt();
+  });
+}
+
 async function completeSale() {
   if (!cart.length) { toast('Cart is empty', true); return; }
   const subtotal = cart.reduce((s, ci) => s + ci.line_total, 0);
@@ -238,6 +574,23 @@ async function completeSale() {
     toast(`Sale completed — Invoice ${sale.invoice_no}`);
     clearCart();
     loadCatalog();
+
+    openModal(`
+      <div style="text-align: center; padding: 10px 0;">
+        <div style="font-size: 36px; margin-bottom: 8px;">✅</div>
+        <h3>Sale Completed!</h3>
+        <p style="color: var(--text-dim); margin-bottom: 14px;">Invoice: <strong>${sale.invoice_no}</strong></p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn primary" id="postPrintThermalBtn">🖨️ Print Thermal Receipt</button>
+          <button class="btn" id="postCloseModal">Done / New Sale</button>
+        </div>
+      </div>
+    `);
+    document.getElementById('postCloseModal').addEventListener('click', closeModal);
+    document.getElementById('postPrintThermalBtn').addEventListener('click', () => {
+      printThermalReceipt(sale.id);
+      closeModal();
+    });
   } else {
     toast('Failed to record sale', true);
   }
@@ -287,9 +640,13 @@ async function viewSale(id) {
       <div class="row grand"><span>Total</span><span>${fmt(sale.total)}</span></div>
       <div class="row"><span>Change</span><span>${fmt(sale.change_due)}</span></div>
     </div>
-    <div class="modal-actions"><button class="btn" id="closeSaleModal">Close</button></div>
+    <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
+      <button class="btn primary" id="printThermalBtn">🖨️ Thermal Print</button>
+      <button class="btn" id="closeSaleModal">Close</button>
+    </div>
   `);
   document.getElementById('closeSaleModal').addEventListener('click', closeModal);
+  document.getElementById('printThermalBtn').addEventListener('click', () => printThermalReceipt(sale.id));
 }
 
 async function loadCustomers() {
@@ -374,6 +731,8 @@ function init() {
   });
   $('#amountPaidInput').addEventListener('input', recalcChange);
   $('#completeSaleBtn').addEventListener('click', completeSale);
+  $('#previewInvoiceBtn').addEventListener('click', previewCartInvoice);
+  $('#printCartBtn').addEventListener('click', printCartThermalReceipt);
   $('#clearCartBtn').addEventListener('click', clearCart);
 
   $('#posCatalogSearch')?.addEventListener('input', loadCatalog);
