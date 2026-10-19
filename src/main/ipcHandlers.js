@@ -92,12 +92,54 @@ function registerIpcHandlers(ipcMain, db, dialog) {
 
     const totalItems = db.prepare('SELECT COUNT(*) AS cnt FROM items WHERE is_active = 1').get().cnt;
 
+    const weeklySalesRaw = db.prepare(`
+      SELECT date(created_at) AS sale_date, COALESCE(SUM(total), 0) AS total, COALESCE(COUNT(*), 0) AS count
+      FROM sales
+      WHERE created_at >= datetime('now', '-6 days', 'start of day', 'localtime')
+      GROUP BY date(created_at)
+      ORDER BY sale_date ASC
+    `).all();
+
+    const weeklySales = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const found = weeklySalesRaw.find(r => r.sale_date === dateStr);
+      weeklySales.push({
+        date: dateStr,
+        label: d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' }),
+        total: found ? found.total : 0,
+        count: found ? found.count : 0
+      });
+    }
+
+    const categorySales = db.prepare(`
+      SELECT COALESCE(i.category, 'Uncategorized') AS category, COALESCE(SUM(si.line_total), 0) AS total
+      FROM sale_items si
+      LEFT JOIN items i ON si.item_id = i.id
+      GROUP BY category
+      ORDER BY total DESC
+      LIMIT 5
+    `).all();
+
+    const topItems = db.prepare(`
+      SELECT si.item_name, COALESCE(SUM(si.quantity), 0) AS qty, COALESCE(SUM(si.line_total), 0) AS total
+      FROM sale_items si
+      GROUP BY si.item_name
+      ORDER BY qty DESC
+      LIMIT 5
+    `).all();
+
     return {
       todaySales: todaySalesRes.total_sales,
       txCount: todaySalesRes.tx_count,
       todayProfit: todayProfitRes.total_profit,
       lowStockItems,
-      totalItems
+      totalItems,
+      weeklySales,
+      categorySales,
+      topItems
     };
   });
 

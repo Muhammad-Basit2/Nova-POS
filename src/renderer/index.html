@@ -63,6 +63,24 @@
           </div>
         </div>
       </div>
+      <div class="dashboard-charts-grid">
+        <div class="card chart-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3>📈 Sales Trend (Last 7 Days)</h3>
+            <span id="dashWeeklyTotal" class="stat-sub" style="font-weight: 600;">7-Day Total: 0.00</span>
+          </div>
+          <div id="dashSalesChart" class="chart-bars" style="display: flex; align-items: flex-end; justify-content: space-between; height: 180px; padding: 10px 5px 0 5px; border-bottom: 1px solid var(--border);"></div>
+          <div id="dashSalesChartLabels" style="display: flex; justify-content: space-between; padding: 6px 5px 0 5px; font-size: 11px; color: var(--text-dim);"></div>
+        </div>
+
+        <div class="card chart-card">
+          <div style="margin-bottom: 12px;">
+            <h3>🏷️ Sales by Category</h3>
+          </div>
+          <div id="dashCategoryChart" style="display: flex; flex-direction: column; gap: 10px; max-height: 210px; overflow-y: auto; padding-right: 2px;"></div>
+        </div>
+      </div>
+
       <div class="card" style="margin-top: 4px;">
         <h3>⚠️ Low Stock Alerts</h3>
         <div class="table-wrap">
