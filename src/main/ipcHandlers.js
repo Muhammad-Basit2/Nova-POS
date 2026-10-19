@@ -151,7 +151,17 @@ function registerIpcHandlers(ipcMain, db, dialog) {
 
     const subtotal = cartItems.reduce((s, i) => s + i.line_total, 0);
     const total    = subtotal - (discount || 0);
-    const change   = Math.max((amount_paid || 0) - total, 0);
+    const paid     = amount_paid || 0;
+    const remaining_balance = Math.max(total - paid, 0);
+    const change   = Math.max(paid - total, 0);
+
+    let status = 'PAID';
+    if (remaining_balance > 0) {
+      status = paid > 0 ? 'PARTIAL' : 'UNPAID';
+    }
+    if (payment_method === 'credit') {
+      status = 'CREDIT';
+    }
 
     /* Generate invoice number */
     const prefix = db.prepare("SELECT value FROM settings WHERE key='invoice_prefix'").get()?.value || 'INV-';
@@ -159,8 +169,8 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     const invoice_no = `${prefix}${String(last + 1).padStart(6, '0')}`;
 
     const insertSale = db.prepare(`
-      INSERT INTO sales (invoice_no, customer_id, subtotal, discount, total, amount_paid, change_due, payment_method, notes)
-      VALUES (@invoice_no, @customer_id, @subtotal, @discount, @total, @amount_paid, @change_due, @payment_method, @notes)
+      INSERT INTO sales (invoice_no, customer_id, subtotal, discount, total, amount_paid, change_due, payment_method, status, notes)
+      VALUES (@invoice_no, @customer_id, @subtotal, @discount, @total, @amount_paid, @change_due, @payment_method, @status, @notes)
     `);
     const insertItem = db.prepare(`
       INSERT INTO sale_items (sale_id, item_id, item_name, barcode, quantity, unit_price, line_total)
@@ -172,8 +182,8 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       const info = insertSale.run({
         invoice_no, customer_id: customer_id || null,
         subtotal, discount: discount || 0, total,
-        amount_paid: amount_paid || 0, change_due: change,
-        payment_method: payment_method || 'cash', notes: notes || ''
+        amount_paid: paid, change_due: change,
+        payment_method: payment_method || 'cash', status, notes: notes || ''
       });
       const saleId = info.lastInsertRowid;
       for (const ci of cartItems) {
@@ -195,11 +205,11 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     });
 
     const saleId = run();
-    return db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    return db.prepare('SELECT s.*, c.name AS customer_name, c.balance AS customer_balance FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?').get(saleId);
   });
 
   ipcMain.handle('sales:getAll', (_e, filters = {}) => {
-    let sql = 'SELECT s.*, c.name AS customer_name FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE 1=1';
+    let sql = 'SELECT s.*, c.name AS customer_name, c.balance AS customer_balance FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE 1=1';
     const params = [];
     if (filters.from) { sql += ' AND s.created_at >= ?'; params.push(filters.from); }
     if (filters.to)   { sql += ' AND s.created_at <= ?'; params.push(filters.to); }
@@ -210,7 +220,7 @@ function registerIpcHandlers(ipcMain, db, dialog) {
   });
 
   ipcMain.handle('sales:getById', (_e, id) => {
-    return db.prepare('SELECT s.*, c.name AS customer_name FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?').get(id);
+    return db.prepare('SELECT s.*, c.name AS customer_name, c.balance AS customer_balance FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?').get(id);
   });
 
   ipcMain.handle('sales:getItems', (_e, saleId) => {

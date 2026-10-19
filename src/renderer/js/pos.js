@@ -290,17 +290,32 @@ async function printThermalReceipt(saleId) {
             <td>Amount Paid:</td>
             <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
           </tr>
+          ${Math.max(sale.total - sale.amount_paid, 0) > 0 ? `
+          <tr>
+            <td>Balance Due:</td>
+            <td class="right">${fmt(Math.max(sale.total - sale.amount_paid, 0))} ${curr}</td>
+          </tr>` : ''}
+          ${sale.change_due > 0 ? `
           <tr>
             <td>Change Due:</td>
             <td class="right">${fmt(sale.change_due)} ${curr}</td>
+          </tr>` : ''}
+          ${sale.customer_id ? `
+          <tr>
+            <td>Prev Balance:</td>
+            <td class="right">${fmt(Math.max((sale.customer_balance || 0) - Math.max(sale.total - sale.amount_paid, 0), 0))} ${curr}</td>
           </tr>
+          <tr class="bold">
+            <td>Updated Balance:</td>
+            <td class="right">${fmt(sale.customer_balance || 0)} ${curr}</td>
+          </tr>` : ''}
         </table>
 
         <div class="divider"></div>
         
         <div class="footer">
           ${receiptFooter}<br>
-          <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+          <span style="font-size: 10px; color: #111111;">Powered by Nova POS</span>
         </div>
       </body>
       </html>
@@ -339,29 +354,39 @@ function getCartContext() {
   const total = Math.max(subtotal - discount, 0);
   const paid = parseFloat($('#amountPaidInput').value) || 0;
   const payment_method = $('#paymentMethod')?.value || 'cash';
+  const balanceDue = Math.max(total - paid, 0);
 
   const customerInputVal = $('#customerSearchInput')?.value.trim() || '';
   let walkInName = $('#walkInNameInput')?.value.trim() || '';
 
   let custDisplay = 'Walk-in Customer';
+  let custObj = null;
   if (selectedCustomerId) {
-    const cust = customers.find(c => c.id === selectedCustomerId);
-    if (cust) custDisplay = `${cust.name}${cust.phone ? ' (' + cust.phone + ')' : ''}`;
+    custObj = customers.find(c => c.id === selectedCustomerId);
+    if (custObj) custDisplay = `${custObj.name}${custObj.phone ? ' (' + custObj.phone + ')' : ''}`;
   } else if (walkInName) {
     custDisplay = `Walk-in: ${walkInName}`;
   } else if (customerInputVal) {
+    custObj = customers.find(c => c.name.toLowerCase() === customerInputVal.toLowerCase());
     custDisplay = customerInputVal;
   }
+
+  const prevBalance = custObj ? custObj.balance : 0;
+  const updatedBalance = prevBalance + balanceDue;
 
   return {
     invoice_no: 'DRAFT / PREVIEW',
     created_at: new Date().toLocaleString(),
     customer_name: custDisplay,
+    customer_id: custObj ? custObj.id : null,
+    customer_balance: updatedBalance,
+    prev_balance: prevBalance,
     payment_method,
     subtotal,
     discount,
     total,
     amount_paid: paid,
+    balance_due: balanceDue,
     change_due: Math.max(paid - total, 0)
   };
 }
@@ -456,10 +481,25 @@ async function printCartThermalReceipt() {
             <td>Amount Paid:</td>
             <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
           </tr>
+          ${sale.balance_due > 0 ? `
+          <tr>
+            <td>Balance Due:</td>
+            <td class="right">${fmt(sale.balance_due)} ${curr}</td>
+          </tr>` : ''}
+          ${sale.change_due > 0 ? `
           <tr>
             <td>Change Due:</td>
             <td class="right">${fmt(sale.change_due)} ${curr}</td>
+          </tr>` : ''}
+          ${sale.customer_id ? `
+          <tr>
+            <td>Prev Balance:</td>
+            <td class="right">${fmt(sale.prev_balance)} ${curr}</td>
           </tr>
+          <tr class="bold">
+            <td>Updated Balance:</td>
+            <td class="right">${fmt(sale.customer_balance)} ${curr}</td>
+          </tr>` : ''}
         </table>
 
         <div class="divider"></div>
@@ -513,7 +553,12 @@ function previewCartInvoice() {
       ${sale.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(sale.discount)}</span></div>` : ''}
       <div class="row grand"><span>Total</span><span>${fmt(sale.total)}</span></div>
       <div class="row"><span>Amount Paid</span><span>${fmt(sale.amount_paid)}</span></div>
-      <div class="row"><span>Change Due</span><span>${fmt(sale.change_due)}</span></div>
+      ${sale.balance_due > 0 ? `<div class="row" style="color: var(--accent);"><span>Balance Due</span><span>${fmt(sale.balance_due)}</span></div>` : ''}
+      ${sale.change_due > 0 ? `<div class="row"><span>Change Due</span><span>${fmt(sale.change_due)}</span></div>` : ''}
+      ${sale.customer_id ? `
+        <div class="row"><span>Prev Balance</span><span>${fmt(sale.prev_balance)}</span></div>
+        <div class="row grand"><span>Updated Balance</span><span>${fmt(sale.customer_balance)}</span></div>
+      ` : ''}
       <div class="row"><span>Payment Method</span><span>${sale.payment_method.toUpperCase()}</span></div>
     </div>
     <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
@@ -534,6 +579,7 @@ async function completeSale() {
   const total = Math.max(subtotal - discount, 0);
   const paid = parseFloat($('#amountPaidInput').value) || 0;
   const payment_method = $('#paymentMethod').value;
+  const remainingBalance = Math.max(total - paid, 0);
   
   const customerInputVal = $('#customerSearchInput')?.value.trim() || '';
   let customer_id = selectedCustomerId;
@@ -554,14 +600,19 @@ async function completeSale() {
     }
   }
 
+  if (remainingBalance > 0 && !customer_id) {
+    toast('Please select a customer for partial payments / remaining balance', true);
+    return;
+  }
+
+  if (payment_method === 'cash' && paid < total && !customer_id) {
+    toast('Insufficient amount paid', true);
+    return;
+  }
+
   let notes = '';
   if (!customer_id && walkInName) {
     notes = `Walk-in: ${walkInName}`;
-  }
-
-  if (payment_method === 'cash' && paid < total) {
-    toast('Insufficient amount paid', true);
-    return;
   }
 
   const sale = await api.sales.create({
@@ -631,14 +682,26 @@ async function viewSale(id) {
     `<tr><td>${i.item_name}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.line_total)}</td></tr>`
   ).join('');
 
+  const balanceDue = Math.max(sale.total - sale.amount_paid, 0);
+  const currBal = sale.customer_balance || 0;
+  const prevBal = sale.customer_id ? Math.max(currBal - balanceDue, 0) : 0;
+
   openModal(`
-    <h3>Invoice ${sale.invoice_no}</h3>
+    <h3>Invoice ${sale.invoice_no} (${sale.status || 'PAID'})</h3>
+    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Customer: <strong>${sale.customer_name || 'Walk-in'}</strong></p>
     <table class="table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="totals" style="margin-top:10px">
       <div class="row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
-      <div class="row"><span>Discount</span><span>${fmt(sale.discount)}</span></div>
+      ${sale.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(sale.discount)}</span></div>` : ''}
       <div class="row grand"><span>Total</span><span>${fmt(sale.total)}</span></div>
-      <div class="row"><span>Change</span><span>${fmt(sale.change_due)}</span></div>
+      <div class="row"><span>Amount Paid</span><span>${fmt(sale.amount_paid)}</span></div>
+      ${balanceDue > 0 ? `<div class="row" style="color: var(--accent);"><span>Balance Due</span><span>${fmt(balanceDue)}</span></div>` : ''}
+      ${sale.change_due > 0 ? `<div class="row"><span>Change Due</span><span>${fmt(sale.change_due)}</span></div>` : ''}
+      ${sale.customer_id ? `
+        <div class="row"><span>Prev Balance</span><span>${fmt(prevBal)}</span></div>
+        <div class="row grand"><span>Updated Balance</span><span>${fmt(currBal)}</span></div>
+      ` : ''}
+      <div class="row"><span>Payment Method</span><span>${sale.payment_method.toUpperCase()}</span></div>
     </div>
     <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
       <button class="btn primary" id="printThermalBtn">🖨️ Thermal Print</button>

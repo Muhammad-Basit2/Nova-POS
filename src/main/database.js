@@ -71,6 +71,7 @@ function createSchema(db) {
       amount_paid   REAL    DEFAULT 0,
       change_due    REAL    DEFAULT 0,
       payment_method TEXT   DEFAULT 'cash',
+      status        TEXT    DEFAULT 'PAID',
       notes         TEXT    DEFAULT '',
       created_at    TEXT    DEFAULT (datetime('now','localtime')),
       FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
@@ -105,6 +106,10 @@ function createSchema(db) {
       value         TEXT    DEFAULT ''
     );
   `);
+
+  try {
+    db.exec("ALTER TABLE sales ADD COLUMN status TEXT DEFAULT 'PAID'");
+  } catch (e) {}
 }
 
 function seedDefaults(db) {
