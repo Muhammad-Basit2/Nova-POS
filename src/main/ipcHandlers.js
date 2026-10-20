@@ -237,11 +237,11 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     return db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
   });
   ipcMain.handle('customers:create', (_e, data) => {
-    const info = db.prepare('INSERT INTO customers (name,phone,address) VALUES (@name,@phone,@address)').run(data);
+    const info = db.prepare('INSERT INTO customers (name,phone,cnic,address) VALUES (@name,@phone,@cnic,@address)').run(data);
     return { id: info.lastInsertRowid, ...data, balance: 0 };
   });
   ipcMain.handle('customers:update', (_e, id, data) => {
-    db.prepare('UPDATE customers SET name=@name, phone=@phone, address=@address WHERE id=@id').run({ id, ...data });
+    db.prepare('UPDATE customers SET name=@name, phone=@phone, cnic=@cnic, address=@address WHERE id=@id').run({ id, ...data });
     return db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
   });
   ipcMain.handle('customers:delete', (_e, id) => {

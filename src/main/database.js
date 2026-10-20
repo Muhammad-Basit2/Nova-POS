@@ -47,6 +47,7 @@ function createSchema(db) {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       name          TEXT    NOT NULL,
       phone         TEXT    DEFAULT '',
+      cnic          TEXT    DEFAULT '',
       address       TEXT    DEFAULT '',
       balance       REAL    DEFAULT 0,
       created_at    TEXT    DEFAULT (datetime('now','localtime'))
@@ -107,9 +108,13 @@ function createSchema(db) {
     );
   `);
 
-  try {
+  if (!db.pragma('table_info(customers)').some((column) => column.name === 'cnic')) {
+    db.exec("ALTER TABLE customers ADD COLUMN cnic TEXT DEFAULT ''");
+  }
+
+  if (!db.pragma('table_info(sales)').some((column) => column.name === 'status')) {
     db.exec("ALTER TABLE sales ADD COLUMN status TEXT DEFAULT 'PAID'");
-  } catch (e) {}
+  }
 }
 
 function seedDefaults(db) {

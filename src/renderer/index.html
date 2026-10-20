@@ -182,24 +182,24 @@
     </section>
 
     <section class="view" id="view-customers">
-      <div class="toolbar">
-        <button id="addCustomerBtn" class="btn primary">➕ Add Customer</button>
-        <button id="addCustomerTxBtn" class="btn">💵 Add Transaction</button>
+      <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <input type="text" id="customerSearch" class="input" placeholder="🔍 Search customer name or phone..." style="max-width: 320px;" />
+        <button id="addCustomerBtn" class="btn primary">👤+ Add Customer</button>
       </div>
-      <div class="ledger-grid">
-        <div class="table-wrap card">
-          <table class="table" id="customerEntityTable">
-            <thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Actions</th></tr></thead>
-            <tbody id="customerEntityBody"></tbody>
-          </table>
-        </div>
-        <div class="card" id="customerLedgerDetail">
-          <h3 id="customerDetailTitle">Select a customer</h3>
-          <table class="table">
-            <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
-            <tbody id="customerLedgerBody"></tbody>
-          </table>
-        </div>
+      <div class="table-wrap card">
+        <table class="table" id="customerEntityTable">
+          <thead>
+            <tr>
+              <th>Customer Name</th>
+              <th>Phone</th>
+              <th>CNIC</th>
+              <th>Current Balance (Udhaar)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customerEntityBody"></tbody>
+        </table>
+        <div id="customerEmpty" class="empty-state hidden">No customers found</div>
       </div>
     </section>
 
