@@ -539,33 +539,157 @@ async function printCartThermalReceipt() {
   }
 }
 
-function previewCartInvoice() {
+async function previewCartInvoice() {
   if (!cart.length) { toast('Cart is empty', true); return; }
   const sale = getCartContext();
-  const rows = cart.map(i => `<tr><td>${i.item_name}</td><td>${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.line_total)}</td></tr>`).join('');
-  
+  const allSettings = await api.settings.getAll();
+
+  const storeName = allSettings.store_name || 'Nova POS Store';
+  const storePhone = allSettings.store_phone || '';
+  const storeAddress = allSettings.store_address || '';
+  const receiptFooter = allSettings.receipt_footer || 'Thank you for shopping with us!';
+  const curr = allSettings.currency || '';
+
+  const itemsRows = cart.map(i => `
+    <tr>
+      <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+    </tr>
+    <tr>
+      <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
+      <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+    </tr>
+  `).join('');
+
+  const receiptHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 12px;
+          width: 72mm;
+          margin: 0 auto;
+          padding: 5mm;
+          color: #000;
+          background: #fff;
+          line-height: 1.2;
+        }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        td { font-size: 12px; }
+        .totals-table td { padding: 2px 0; }
+        .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+      </style>
+    </head>
+    <body>
+      <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+      ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
+      ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
+      
+      <div class="divider"></div>
+      
+      <div><span class="bold">Status:</span> DRAFT RECEIPT</div>
+      <div><span class="bold">Date:</span> ${sale.created_at}</div>
+      <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
+      <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+
+      <div class="divider"></div>
+
+      <table>
+        <tbody>
+          ${itemsRows}
+        </tbody>
+      </table>
+
+      <div class="divider"></div>
+
+      <table class="totals-table">
+        <tr>
+          <td>Subtotal:</td>
+          <td class="right">${fmt(sale.subtotal)} ${curr}</td>
+        </tr>
+        ${sale.discount > 0 ? `
+        <tr>
+          <td>Discount:</td>
+          <td class="right">-${fmt(sale.discount)} ${curr}</td>
+        </tr>` : ''}
+        <tr class="bold" style="font-size: 14px;">
+          <td>TOTAL:</td>
+          <td class="right">${fmt(sale.total)} ${curr}</td>
+        </tr>
+        <tr>
+          <td>Amount Paid:</td>
+          <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
+        </tr>
+        ${sale.balance_due > 0 ? `
+        <tr>
+          <td>Balance Due:</td>
+          <td class="right">${fmt(sale.balance_due)} ${curr}</td>
+        </tr>` : ''}
+        ${sale.change_due > 0 ? `
+        <tr>
+          <td>Change Due:</td>
+          <td class="right">${fmt(sale.change_due)} ${curr}</td>
+        </tr>` : ''}
+        ${sale.customer_id ? `
+        <tr>
+          <td>Prev Balance:</td>
+          <td class="right">${fmt(sale.prev_balance)} ${curr}</td>
+        </tr>
+        <tr class="bold">
+          <td>Updated Balance:</td>
+          <td class="right">${fmt(sale.customer_balance)} ${curr}</td>
+        </tr>` : ''}
+      </table>
+
+      <div class="divider"></div>
+      
+      <div class="footer">
+        ${receiptFooter}<br>
+        <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+      </div>
+    </body>
+    </html>
+  `;
+
   openModal(`
-    <h3>Invoice Preview (Draft)</h3>
-    <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Customer: <strong>${sale.customer_name}</strong></p>
-    <table class="table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="totals" style="margin-top:10px">
-      <div class="row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
-      ${sale.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(sale.discount)}</span></div>` : ''}
-      <div class="row grand"><span>Total</span><span>${fmt(sale.total)}</span></div>
-      <div class="row"><span>Amount Paid</span><span>${fmt(sale.amount_paid)}</span></div>
-      ${sale.balance_due > 0 ? `<div class="row" style="color: var(--accent);"><span>Balance Due</span><span>${fmt(sale.balance_due)}</span></div>` : ''}
-      ${sale.change_due > 0 ? `<div class="row"><span>Change Due</span><span>${fmt(sale.change_due)}</span></div>` : ''}
-      ${sale.customer_id ? `
-        <div class="row"><span>Prev Balance</span><span>${fmt(sale.prev_balance)}</span></div>
-        <div class="row grand"><span>Updated Balance</span><span>${fmt(sale.customer_balance)}</span></div>
-      ` : ''}
-      <div class="row"><span>Payment Method</span><span>${sale.payment_method.toUpperCase()}</span></div>
+    <h3 style="margin-bottom: 10px;">📋 Invoice Preview (Draft)</h3>
+    <div style="background: #fff; border-radius: 8px; padding: 0; display: flex; justify-content: center; max-height: 60vh; overflow-y: auto;">
+      <iframe id="invoicePreviewFrame" style="width: 82mm; min-height: 420px; border: none; background: #fff; border-radius: 8px;" scrolling="no"></iframe>
     </div>
     <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
-      <button class="btn primary" id="previewPrintThermalBtn">🖨️ Thermal Print</button>
+      <button class="btn primary" id="previewPrintThermalBtn">🖨️ Print</button>
       <button class="btn" id="closePreviewModal">Close</button>
     </div>
   `);
+
+  // Write receipt HTML into the preview iframe
+  const previewFrame = document.getElementById('invoicePreviewFrame');
+  const frameDoc = previewFrame.contentWindow.document;
+  frameDoc.open();
+  frameDoc.write(receiptHtml);
+  frameDoc.close();
+
+  // Auto-resize iframe to fit content
+  previewFrame.addEventListener('load', () => {
+    try {
+      const contentHeight = previewFrame.contentWindow.document.body.scrollHeight;
+      previewFrame.style.height = contentHeight + 'px';
+    } catch (e) { /* ignore */ }
+  });
+  // Also try resizing after a short delay (fallback)
+  setTimeout(() => {
+    try {
+      const contentHeight = previewFrame.contentWindow.document.body.scrollHeight;
+      previewFrame.style.height = contentHeight + 'px';
+    } catch (e) { /* ignore */ }
+  }, 100);
+
   document.getElementById('closePreviewModal').addEventListener('click', closeModal);
   document.getElementById('previewPrintThermalBtn').addEventListener('click', () => {
     printCartThermalReceipt();

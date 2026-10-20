@@ -3,6 +3,21 @@
  *  src/renderer/css/style.css
  * ============================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Gulzar&display=swap');
+@font-face {
+  font-family: 'Gulzar';
+  src: url('../../assets/fonts/Gulzar-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+.urdu {
+  font-family: 'Gulzar', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', sans-serif;
+  direction: rtl;
+  text-align: right;
+}
+
+
 :root {
   --bg:        #12141a;
   --bg-alt:    #1a1d26;

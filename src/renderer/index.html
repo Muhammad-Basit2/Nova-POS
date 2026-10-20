@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com" />
   <title>Nova POS</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -20,9 +20,10 @@
     <button class="tab active" data-view="dashboard">📊 Dashboard</button>
     <button class="tab" data-view="pos">🛒 POS</button>
     <button class="tab" data-view="inventory">📦 Inventory</button>
-    <button class="tab" data-view="customers">👥 Customers</button>
-    <button class="tab" data-view="vendors">🏢 Vendors</button>
+    <button class="tab" data-view="purchases">📋 Purchases</button>
     <button class="tab" data-view="sales">🧾 Sales History</button>
+    <button class="tab" data-view="customers">👥 Customers / Udhaar</button>
+    <button class="tab" data-view="suppliers">🤝 Suppliers</button>
     <button class="tab" data-view="settings">⚙️ Settings</button>
   </nav>
 
@@ -203,25 +204,50 @@
       </div>
     </section>
 
-    <section class="view" id="view-vendors">
-      <div class="toolbar">
-        <button id="addVendorBtn" class="btn primary">➕ Add Vendor</button>
-        <button id="addVendorTxBtn" class="btn">💵 Add Transaction</button>
+    <section class="view" id="view-purchases">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h2>Stock Purchases</h2>
+        <button id="addPurchaseBtn" class="btn primary">＋ Record New Stock Purchase</button>
       </div>
-      <div class="ledger-grid">
-        <div class="table-wrap card">
-          <table class="table" id="vendorEntityTable">
-            <thead><tr><th>Name</th><th>Phone</th><th>Balance</th><th>Actions</th></tr></thead>
-            <tbody id="vendorEntityBody"></tbody>
-          </table>
-        </div>
-        <div class="card" id="vendorLedgerDetail">
-          <h3 id="vendorDetailTitle">Select a vendor</h3>
-          <table class="table">
-            <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
-            <tbody id="vendorLedgerBody"></tbody>
-          </table>
-        </div>
+      <div class="table-wrap card">
+        <table class="table" id="purchasesTable">
+          <thead>
+            <tr>
+              <th>Inv #</th>
+              <th>Date</th>
+              <th>Supplier</th>
+              <th class="num">Total Bill</th>
+              <th class="num">Paid Amount</th>
+              <th class="num">Balance Due</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="purchasesBody"></tbody>
+        </table>
+        <div id="purchasesEmpty" class="empty-state hidden">No stock purchases recorded yet</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-suppliers">
+      <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <input type="text" id="supplierSearch" class="input" placeholder="Search supplier or company..." style="max-width: 320px;" />
+        <button id="addSupplierBtn" class="btn primary">＋ Add Supplier</button>
+      </div>
+      <div class="table-wrap card">
+        <table class="table" id="supplierEntityTable">
+          <thead>
+            <tr>
+              <th>Company / Supplier Name</th>
+              <th>Contact Person</th>
+              <th>Phone</th>
+              <th class="num">Total Paid</th>
+              <th class="num">Payable Balance</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="supplierEntityBody"></tbody>
+        </table>
+        <div id="supplierEmpty" class="empty-state hidden">No suppliers found</div>
       </div>
     </section>
 

@@ -8,6 +8,7 @@ import { initPOS } from './pos.js';
 import { initInventory } from './inventory.js';
 import { initCustomers } from './customers.js';
 import { initVendors } from './vendors.js';
+import { initPurchases } from './purchases.js';
 import { initBackup } from './backup.js';
 import { initDataManagement } from './dataManagement.js';
 
@@ -50,12 +51,15 @@ export function fmt(n) { return Number(n || 0).toFixed(2); }
  *  View Router
  * ============================================================ */
 const viewInitializers = {
+  purchases:  () => initPurchases.refresh?.(),
   dashboard:  () => initDashboard.refresh?.(),
   pos:        () => initPOS.refresh?.(),
   inventory:  () => initInventory.refresh?.(),
-  customers:  () => initCustomers.refresh?.(),
-  vendors:    () => initVendors.refresh?.(),
+  purchases:  () => initPurchases.refresh?.(),
+  suppliers:  () => initVendors.refresh?.(),
   sales:      () => initPOS.loadSalesHistory?.(),
+  customers:  () => initCustomers.refresh?.(),
+  suppliers:  () => initVendors.refresh?.(),
   settings:   () => loadSettingsForm(),
 };
 
@@ -148,10 +152,11 @@ function initShortcuts() {
       case 'F1': e.preventDefault(); switchView('dashboard'); break;
       case 'F2': e.preventDefault(); switchView('pos'); break;
       case 'F3': e.preventDefault(); switchView('inventory'); break;
-      case 'F4': e.preventDefault(); switchView('customers'); break;
-      case 'F5': e.preventDefault(); switchView('vendors'); break;
-      case 'F6': e.preventDefault(); switchView('sales'); break;
-      case 'F7': e.preventDefault(); switchView('settings', 'backup'); break;
+      case 'F4': e.preventDefault(); switchView('purchases'); break;
+      case 'F5': e.preventDefault(); switchView('sales'); break;
+      case 'F6': e.preventDefault(); switchView('customers'); break;
+      case 'F7': e.preventDefault(); switchView('suppliers'); break;
+      case 'F8': e.preventDefault(); switchView('settings', 'backup'); break;
       case 'F8': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.clearCart?.(); } break;
       case 'F9': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.completeSale?.(); } break;
     }
@@ -174,6 +179,7 @@ async function boot() {
   await loadSettings();
   initDashboard.init();
   initPOS.init();
+   initPurchases.init();
   initInventory.init();
   initCustomers.init();
   initVendors.init();

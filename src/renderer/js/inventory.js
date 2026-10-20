@@ -31,7 +31,7 @@ async function refresh() {
     const lowStock = i.stock <= i.min_stock;
     tr.innerHTML = `
       <td>${i.barcode || '—'}</td>
-      <td>${i.name}</td>
+      <td><div>${i.name}</div>${i.urdu_name ? `<div class="urdu" style="font-size:12px; color:var(--accent);">${i.urdu_name}</div>` : ''}</td>
       <td>${i.category || '—'}</td>
       <td class="num">${fmt(i.cost_price)}</td>
       <td class="num">${fmt(i.sale_price)}</td>
@@ -61,7 +61,8 @@ function itemForm(item = null) {
   openModal(`
     <h3>${isEdit ? 'Edit Item' : 'Add Item'}</h3>
     <label>Barcode<input class="input" id="f-barcode" value="${item?.barcode ?? ''}" /></label>
-    <label>Name *<input class="input" id="f-name" value="${item?.name ?? ''}" /></label>
+    <label>English Name *<input class="input" id="f-name" value="${item?.name ?? ''}" /></label>
+    <label>Urdu Name (اردو نام)<input class="input urdu" id="f-urdu-name" value="${item?.urdu_name ?? ''}" placeholder="کوکنگ آئل" /></label>
     <label>Category<input class="input" id="f-category" value="${item?.category ?? ''}" /></label>
     <label>Cost Price<input class="input" type="number" step="0.01" id="f-cost" value="${item?.cost_price ?? 0}" /></label>
     <label>Sale Price<input class="input" type="number" step="0.01" id="f-sale" value="${item?.sale_price ?? 0}" /></label>
@@ -82,6 +83,7 @@ async function saveItem(id) {
   const data = {
     barcode: $('#f-barcode').value.trim(),
     name: $('#f-name').value.trim(),
+    urdu_name: $('#f-urdu-name').value.trim(),
     category: $('#f-category').value.trim(),
     cost_price: parseFloat($('#f-cost').value) || 0,
     sale_price: parseFloat($('#f-sale').value) || 0,

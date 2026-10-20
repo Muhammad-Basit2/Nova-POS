@@ -32,21 +32,21 @@ function registerIpcHandlers(ipcMain, db, dialog) {
 
   ipcMain.handle('items:create', (_e, data) => {
     const stmt = db.prepare(`
-      INSERT INTO items (barcode, name, category, cost_price, sale_price, stock, min_stock, unit)
-      VALUES (@barcode, @name, @category, @cost_price, @sale_price, @stock, @min_stock, @unit)
+      INSERT INTO items (barcode, name, urdu_name, category, cost_price, sale_price, stock, min_stock, unit)
+      VALUES (@barcode, @name, @urdu_name, @category, @cost_price, @sale_price, @stock, @min_stock, @unit)
     `);
-    const info = stmt.run(data);
+    const info = stmt.run({ urdu_name: '', ...data });
     return { id: info.lastInsertRowid, ...data };
   });
 
   ipcMain.handle('items:update', (_e, id, data) => {
     const stmt = db.prepare(`
-      UPDATE items SET barcode=@barcode, name=@name, category=@category,
+      UPDATE items SET barcode=@barcode, name=@name, urdu_name=@urdu_name, category=@category,
         cost_price=@cost_price, sale_price=@sale_price, stock=@stock, min_stock=@min_stock,
         unit=@unit, is_active=@is_active, updated_at=datetime('now','localtime')
       WHERE id = @id
     `);
-    stmt.run({ id, ...data });
+    stmt.run({ id, urdu_name: '', ...data });
     return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   });
 
