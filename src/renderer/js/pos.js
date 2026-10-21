@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  *  Nova POS – POS Cashier Logic
  *  src/renderer/js/pos.js
  * ============================================================ */
@@ -33,16 +33,16 @@ function invoiceFontStyles() {
       font-family: 'Gulzar';
       src: url('../../assets/fonts/Gulzar-Regular.ttf') format('truetype');
       font-style: normal;
-      font-weight: 400;
+      font-weight: 600;
     }
     .urdu-item-name {
       display: block;
       direction: rtl;
       text-align: right;
       font-family: 'Gulzar', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', serif;
-      font-size: 16px;
+      font-size: 18px;
       line-height: 1.8;
-      font-weight: normal;
+      font-weight: 600;
     }
   `;
 }
@@ -274,38 +274,48 @@ async function printThermalReceipt(saleId) {
           @page { size: 80mm auto; margin: 0; }
           ${invoiceFontStyles()}
           body {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
             width: 72mm;
             margin: 0 auto;
-            padding: 5mm;
+            padding: 3mm;
             color: #000;
             background: #fff;
-            line-height: 1.2;
+            line-height: 1.4;
           }
           .center { text-align: center; }
           .right { text-align: right; }
           .bold { font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .divider { border-top: 1px dashed #000; margin: 7px 0; }
           table { width: 100%; border-collapse: collapse; }
-          td { font-size: 12px; }
+          td { font-size: 13px; }
           .totals-table td { padding: 2px 0; }
           .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+          th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+          .item-total { font-weight: bold; }
+          .meta-label { font-weight: bold; }
+          .section-title { text-align: center; font-size: 17px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; }
+          .store-name { font-size: 19px; font-weight: 800; margin-bottom: 2px; letter-spacing: .5px; }
+          .store-meta { font-size: 12px; }
+          .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
+          .divider-thin { border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px; }
+          .total-row { font-size: 15px; font-weight: 800; }
+          .balance-row { font-size: 13px; font-weight: bold; }
         </style>
       </head>
       <body>
-        <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        <div class="center store-name">${storeName}</div>
         ${printLogoHTML(null, 300)}
-        ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : ''}
+        <div class="center store-meta">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>
 
-        <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
-        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+        <div class="divider-thick"></div>
+        <div class="divider-thin"></div>
 
-        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">RECEIPT</div>
-        <div><span class="bold">Date:</span> ${sale.created_at}</div>
-        <div><span class="bold">Invoice:</span> ${sale.invoice_no}</div>
-        <div><span class="bold">Customer:</span> ${custDisplay}</div>
-        <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+        <div class="section-title">RECEIPT</div>
+        <div><span class="meta-label">Date:</span> ${sale.created_at}</div>
+        <div><span class="meta-label">Invoice:</span> ${sale.invoice_no}</div>
+        <div><span class="meta-label">Customer:</span> ${custDisplay}</div>
+        <div><span class="meta-label">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
 
         <div class="divider"></div>
 
@@ -331,15 +341,15 @@ async function printThermalReceipt(saleId) {
             <td class="right">${fmt(sale.subtotal)} ${curr}</td>
           </tr>
           ${sale.discount > 0 ? `<tr>
-            <td>Discounts (N/A):</td>
+            <td>Discount:</td>
             <td class="right">-${fmt(sale.discount)} ${curr}</td>
           </tr>` : `
           <tr>
-            <td>Discounts (N/A):</td>
+            <td>Discount:</td>
             <td class="right">0.00 ${curr}</td>
           </tr>`}
-          <tr class="bold" style="font-size: 14px;">
-            <td>TOTAL (BOLD):</td>
+          <tr class="total-row">
+            <td>TOTAL:</td>
             <td class="right">${fmt(sale.total)} ${curr}</td>
           </tr>
           <tr>
@@ -364,13 +374,13 @@ async function printThermalReceipt(saleId) {
           </tr>` : ''}
         </table>
 
-        <div style="border-top: 2px solid #000; margin: 8px 0;"></div>
-        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+        <div class="divider-thick"></div>
+        <div class="divider-thin"></div>
 
         <div class="footer">
           ${receiptFooter.toUpperCase()}<br>
           ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : ''}
-          <br><span style="font-size: 10px; color: #111111;">Powered by Nova POS</span>
+          <br><span style="font-size: 10px; color: #111111;">Powered by Basit | 0340 1358760</span>
         </div>
       </body>
       </html>
@@ -484,37 +494,57 @@ async function printCartThermalReceipt() {
           @page { size: 80mm auto; margin: 0; }
           ${invoiceFontStyles()}
           body {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
             width: 72mm;
             margin: 0 auto;
-            padding: 5mm;
+            padding: 3mm;
             color: #000;
             background: #fff;
-            line-height: 1.2;
+            line-height: 1.4;
           }
           .center { text-align: center; }
           .right { text-align: right; }
           .bold { font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 6px 0; }
+          .divider { border-top: 1px dashed #000; margin: 7px 0; }
           table { width: 100%; border-collapse: collapse; }
-          td { font-size: 12px; }
+          td { font-size: 13px; }
           .totals-table td { padding: 2px 0; }
           .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+          th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+          .item-total { font-weight: bold; }
+          .meta-label { font-weight: bold; }
+          .section-title { text-align: center; font-size: 17px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; }
+          .store-name { font-size: 19px; font-weight: 800; margin-bottom: 2px; letter-spacing: .5px; }
+          .store-meta { font-size: 12px; }
+          .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
+          .divider-thin { border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px; }
+          .total-row { font-size: 15px; font-weight: 800; }
+          .balance-row { font-size: 13px; font-weight: bold; }
+          th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+          .item-total { font-weight: bold; }
+          .meta-label { font-weight: bold; }
+          .section-title { text-align: center; font-size: 17px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; }
+          .store-name { font-size: 19px; font-weight: 800; margin-bottom: 2px; letter-spacing: .5px; }
+          .store-meta { font-size: 12px; }
+          .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
+          .divider-thin { border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px; }
+          .total-row { font-size: 15px; font-weight: 800; }
+          .balance-row { font-size: 13px; font-weight: bold; }
         </style>
       </head>
       <body>
-        <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        <div class="center store-name">${storeName}</div>
         ${printLogoHTML(null, 300)}
-        ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
+        ${storeAddress || storePhone ? `<div class="center store-meta">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
 
-        <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
-        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+        <div class="divider-thick"></div>
+        <div class="divider-thin"></div>
 
-        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
-        <div><span class="bold">Date:</span> ${sale.created_at}</div>
-        <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
-        <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+        <div class="section-title">Status: DRAFT RECEIPT</div>
+        <div><span class="meta-label">Date:</span> ${sale.created_at}</div>
+        <div><span class="meta-label">Customer:</span> ${sale.customer_name}</div>
+        <div><span class="meta-label">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
 
         <div class="divider"></div>
 
@@ -540,10 +570,10 @@ async function printCartThermalReceipt() {
             <td class="right">${fmt(sale.subtotal)} ${curr}</td>
           </tr>
           ${sale.discount > 0 ? `<tr>
-            <td>Discounts (N/A):</td>
+            <td>Discount:</td>
             <td class="right">-${fmt(sale.discount)} ${curr}</td>
-          </tr>` : `<tr><td>Discounts (N/A):</td><td class="right">0.00 ${curr}</td></tr>`}
-          <tr class="bold" style="font-size: 14px;">
+          </tr>` : `<tr><td>Discount:</td><td class="right">0.00 ${curr}</td></tr>`}
+          <tr class="total-row">
             <td>TOTAL:</td>
             <td class="right">${fmt(sale.total)} ${curr}</td>
           </tr>
@@ -551,7 +581,7 @@ async function printCartThermalReceipt() {
             <td>Amount Paid:</td>
             <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
           </tr>
-          ${sale.balance_due > 0 ? `<tr class="bold">
+          ${sale.balance_due > 0 ? `<tr class="balance-row">
             <td>Balance Due:</td>
             <td class="right">${fmt(sale.balance_due)} ${curr}</td>
           </tr>` : ''}
@@ -569,13 +599,13 @@ async function printCartThermalReceipt() {
           </tr>` : ''}
         </table>
 
-        <div style="border-top: 2px solid #000; margin: 8px 0;"></div>
-        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+        <div class="divider-thick"></div>
+        <div class="divider-thin"></div>
 
         <div class="footer">
           ${receiptFooter.toUpperCase()}<br>
           ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : '' }
-          <br><span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+          <br><span style="font-size: 10px; color: #555;">Powered by Basit | 0340 1358760</span>
         </div>
       </body>
       </html>
@@ -643,37 +673,47 @@ async function previewCartInvoice() {
       <style>
         ${invoiceFontStyles()}
         body {
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 12px;
+        font-family: 'Roboto', sans-serif;
+          font-size: 16px;
           width: 72mm;
           margin: 0 auto;
-          padding: 5mm;
+          padding: 3mm;
           color: #000;
           background: #fff;
-          line-height: 1.2;
+          line-height: 1.4;
         }
         .center { text-align: center; }
         .right { text-align: right; }
         .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        .divider { border-top: 1px dashed #000; margin: 7px 0; }
         table { width: 100%; border-collapse: collapse; }
-        td { font-size: 12px; }
+        td { font-size: 13px; }
         .totals-table td { padding: 2px 0; }
         .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+        th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+        .item-total { font-weight: bold; }
+        .meta-label { font-weight: bold; }
+        .section-title { text-align: center; font-size: 17px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; }
+        .store-name { font-size: 19px; font-weight: 800; margin-bottom: 2px; letter-spacing: .5px; }
+        .store-meta { font-size: 12px; }
+        .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
+        .divider-thin { border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px; }
+        .total-row { font-size: 15px; font-weight: 800; }
+        .balance-row { font-size: 13px; font-weight: bold; }
       </style>
     </head>
     <body>
-      <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+      <div class="center store-name">${storeName}</div>
       ${printLogoHTML(null, 300)}
-      ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
+      ${storeAddress || storePhone ? `<div class="center store-meta">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
 
-      <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
-      <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+      <div class="divider-thick"></div>
+      <div class="divider-thin"></div>
 
-      <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
-      <div><span class="bold">Date:</span> ${sale.created_at}</div>
-      <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
-      <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
+      <div class="section-title">Status: DRAFT RECEIPT</div>
+      <div><span class="meta-label">Date:</span> ${sale.created_at}</div>
+      <div><span class="meta-label">Customer:</span> ${sale.customer_name}</div>
+      <div><span class="meta-label">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
 
       <div class="divider"></div>
 
@@ -699,10 +739,10 @@ async function previewCartInvoice() {
           <td class="right">${fmt(sale.subtotal)} ${curr}</td>
         </tr>
         ${sale.discount > 0 ? `<tr>
-          <td>Discounts (N/A):</td>
+          <td>Discount:</td>
           <td class="right">-${fmt(sale.discount)} ${curr}</td>
-        </tr>` : `<tr><td>Discounts (N/A):</td><td class="right">0.00 ${curr}</td></tr>`}
-        <tr class="bold" style="font-size: 14px;">
+        </tr>` : `<tr><td>Discount:</td><td class="right">0.00 ${curr}</td></tr>`}
+        <tr class="total-row">
           <td>TOTAL:</td>
           <td class="right">${fmt(sale.total)} ${curr}</td>
         </tr>
@@ -734,7 +774,7 @@ async function previewCartInvoice() {
       <div class="footer">
         ${receiptFooter.toUpperCase()}<br>
         ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : '' }
-        <br><span style="font-size: 10px; color: #080808;">Powered by Basit | 0340 1358760</span>
+        <br><span style="font-size: 10px; color: #555;">Powered by Basit | 0340 1358760</span>
       </div>
     </body>
     </html>
