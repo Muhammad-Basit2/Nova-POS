@@ -66,8 +66,8 @@ function itemForm(item = null) {
     <label>Category<input class="input" id="f-category" value="${item?.category ?? ''}" /></label>
     <label>Cost Price<input class="input" type="number" step="0.01" id="f-cost" value="${item?.cost_price ?? 0}" /></label>
     <label>Sale Price<input class="input" type="number" step="0.01" id="f-sale" value="${item?.sale_price ?? 0}" /></label>
-    <label>Stock<input class="input" type="number" id="f-stock" value="${item?.stock ?? 0}" /></label>
-    <label>Min Stock<input class="input" type="number" id="f-min" value="${item?.min_stock ?? 0}" /></label>
+    <label>Stock<input class="input" type="number" step="0.01" id="f-stock" value="${item?.stock ?? 0}" /></label>
+    <label>Min Stock<input class="input" type="number" step="0.01" id="f-min" value="${item?.min_stock ?? 0}" /></label>
     <label>Unit<input class="input" id="f-unit" value="${item?.unit ?? 'pcs'}" /></label>
     <div class="modal-actions">
       <button class="btn" id="f-cancel">Cancel</button>
@@ -87,8 +87,8 @@ async function saveItem(id) {
     category: $('#f-category').value.trim(),
     cost_price: parseFloat($('#f-cost').value) || 0,
     sale_price: parseFloat($('#f-sale').value) || 0,
-    stock: parseInt($('#f-stock').value, 10) || 0,
-    min_stock: parseInt($('#f-min').value, 10) || 0,
+    stock: parseFloat($('#f-stock').value) || 0,
+    min_stock: parseFloat($('#f-min').value) || 0,
     unit: $('#f-unit').value.trim() || 'pcs',
     is_active: 1
   };

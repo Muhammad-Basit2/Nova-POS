@@ -199,7 +199,7 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       if (customer_id && payment_method === 'credit') {
         db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(total, customer_id);
         db.prepare(`INSERT INTO ledger_transactions (entity_type,entity_id,type,amount,description,reference)
-          VALUES ('customer',?,'debit',?,?,?)`).run(customer_id, total, 'Sale invoice', invoice_no);
+          VALUES ('customer',?,'debit',?,?,?)`).run(customer_id, total, `Sale ${invoice_no}`, invoice_no);
       }
       return saleId;
     });
@@ -751,6 +751,96 @@ function registerIpcHandlers(ipcMain, db, dialog) {
   ipcMain.handle('settings:getAll', () => {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     return Object.fromEntries(rows.map(r => [r.key, r.value]));
+  });
+
+  /* ===========================================================
+   *  RETURNS / REFUNDS
+   * =========================================================== */
+  ipcMain.handle('sales:createReturn', (_e, data) => {
+    const { saleId, returnItems, notes } = data;
+    if (!Number.isInteger(saleId) || !returnItems?.length) {
+      throw new Error('Invalid return data');
+    }
+
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    if (!sale) throw new Error('Sale not found');
+    if (sale.status === 'RETURNED') throw new Error('This invoice has already been fully returned');
+
+    const returnPrefix = db.prepare("SELECT value FROM settings WHERE key='return_prefix'").get()?.value || 'RET-';
+    const lastReturn = db.prepare("SELECT COUNT(*) AS cnt FROM returns").get().cnt;
+    const return_no = `${returnPrefix}${String(lastReturn + 1).padStart(6, '0')}`;
+
+    const run = db.transaction(() => {
+      // Insert return header
+      const retInfo = db.prepare(`
+        INSERT INTO returns (return_no, sale_id, customer_id, total_refund, refund_method, notes, created_at)
+        VALUES (@return_no, @sale_id, @customer_id, @total_refund, @refund_method, @notes, datetime('now','localtime'))
+      `).run({
+        return_no, sale_id: saleId, customer_id: sale.customer_id,
+        total_refund: 0, refund_method: sale.payment_method, notes: notes || ''
+      });
+      const returnId = retInfo.lastInsertRowid;
+
+      let totalRefund = 0;
+
+      for (const ri of returnItems) {
+        const saleItem = db.prepare('SELECT * FROM sale_items WHERE id = ? AND sale_id = ?').get(ri.sale_item_id, saleId);
+        if (!saleItem) throw new Error(`Sale item ${ri.sale_item_id} not found in this invoice`);
+        const qtyToReturn = Math.min(Number(ri.quantity) || 1, saleItem.quantity);
+        if (qtyToReturn <= 0) continue;
+
+        const refundAmount = qtyToReturn * saleItem.unit_price;
+        totalRefund += refundAmount;
+
+        // Insert return item
+        db.prepare(`
+          INSERT INTO return_items (return_id, sale_item_id, item_id, item_name, quantity, unit_price, refund_amount, condition)
+          VALUES (@return_id, @sale_item_id, @item_id, @item_name, @quantity, @unit_price, @refund_amount, @condition)
+        `).run({
+          return_id: returnId, sale_item_id: saleItem.id,
+          item_id: saleItem.item_id, item_name: saleItem.item_name,
+          quantity: qtyToReturn, unit_price: saleItem.unit_price,
+          refund_amount: refundAmount, condition: 'resalable'
+        });
+
+        // Restock
+        if (saleItem.item_id) {
+          db.prepare('UPDATE items SET stock = stock + ? WHERE id = ?').run(qtyToReturn, saleItem.item_id);
+        }
+      }
+
+      // Update return total
+      db.prepare('UPDATE returns SET total_refund = ? WHERE id = ?').run(totalRefund, returnId);
+
+      // Update sale status
+      const existingReturn = db.prepare('SELECT COALESCE(SUM(ri.quantity),0) AS returned_qty FROM return_items ri JOIN sale_items si ON ri.sale_item_id = si.id WHERE si.sale_id = ?').get(saleId);
+      const totalSold = db.prepare('SELECT COALESCE(SUM(si.quantity),0) AS total_qty FROM sale_items si WHERE si.sale_id = ?').get(saleId);
+      const status = existingReturn.returned_qty >= totalSold.total_qty ? 'RETURNED' : 'PARTIAL_RETURN';
+      db.prepare('UPDATE sales SET status = ? WHERE id = ?').run(status, saleId);
+
+      // Refund customer balance for credit sales
+      if (sale.customer_id && sale.payment_method === 'credit') {
+        db.prepare('UPDATE customers SET balance = balance - ? WHERE id = ?').run(totalRefund, sale.customer_id);
+        db.prepare(`
+          INSERT INTO ledger_transactions (entity_type, entity_id, type, amount, description, reference)
+          VALUES ('customer', ?, 'credit', ?, ?, ?)
+        `).run(sale.customer_id, totalRefund, `Return refund (${return_no})`, return_no);
+      }
+
+      return { returnId, return_no, totalRefund };
+    });
+
+    return run();
+  });
+
+  ipcMain.handle('sales:getReturns', (_e, saleId) => {
+    return db.prepare(`
+      SELECT r.*,
+        (SELECT GROUP_CONCAT(ri.item_name || ' x' || ri.quantity) FROM return_items ri WHERE ri.return_id = r.id) AS items_summary
+      FROM returns r
+      WHERE r.sale_id = ?
+      ORDER BY r.created_at DESC
+    `).all(saleId);
   });
 }
 

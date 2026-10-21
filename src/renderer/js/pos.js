@@ -251,11 +251,16 @@ async function printThermalReceipt(saleId) {
 
     const itemsRows = items.map(i => `
       <tr>
-        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
+        <td style="text-align:left; padding:2px 0;"><strong>${invoiceItemName(i)}</strong></td>
+        <td style="text-align:center; padding:2px 0;"></td>
+        <td style="text-align:right; padding:2px 0;"></td>
+        <td style="text-align:right; padding:2px 0;"></td>
       </tr>
       <tr>
-        <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
-        <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+        <td style="text-align:left; padding-bottom:4px; color:#555;"></td>
+        <td style="text-align:center; padding-bottom:4px;">${i.quantity}</td>
+        <td style="text-align:right; padding-bottom:4px;">${fmt(i.unit_price)}</td>
+        <td style="text-align:right; padding-bottom:4px; font-weight:600;">${fmt(i.line_total)}</td>
       </tr>
     `).join('');
 
@@ -291,19 +296,28 @@ async function printThermalReceipt(saleId) {
       <body>
         <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
         ${printLogoHTML(null, 300)}
-        ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
-        ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
-        
-        <div class="divider"></div>
-        
-        <div><span class="bold">Invoice:</span> ${sale.invoice_no}</div>
+        ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : ''}
+
+        <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
+        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
+        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
         <div><span class="bold">Date:</span> ${sale.created_at}</div>
+        <div><span class="bold">Invoice:</span> ${sale.invoice_no}</div>
         <div><span class="bold">Customer:</span> ${custDisplay}</div>
         <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
 
         <div class="divider"></div>
 
         <table>
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:2px 0;">Description</th>
+              <th style="text-align:center; padding:2px 0;">Qty</th>
+              <th style="text-align:right; padding:2px 0;">Price</th>
+              <th style="text-align:right; padding:2px 0;">Total</th>
+            </tr>
+          </thead>
           <tbody>
             ${itemsRows}
           </tbody>
@@ -316,31 +330,31 @@ async function printThermalReceipt(saleId) {
             <td>Subtotal:</td>
             <td class="right">${fmt(sale.subtotal)} ${curr}</td>
           </tr>
-          ${sale.discount > 0 ? `
-          <tr>
-            <td>Discount:</td>
+          ${sale.discount > 0 ? `<tr>
+            <td>Discounts (N/A):</td>
             <td class="right">-${fmt(sale.discount)} ${curr}</td>
-          </tr>` : ''}
+          </tr>` : `
+          <tr>
+            <td>Discounts (N/A):</td>
+            <td class="right">0.00 ${curr}</td>
+          </tr>`}
           <tr class="bold" style="font-size: 14px;">
-            <td>TOTAL:</td>
+            <td>TOTAL (BOLD):</td>
             <td class="right">${fmt(sale.total)} ${curr}</td>
           </tr>
           <tr>
             <td>Amount Paid:</td>
             <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
           </tr>
-          ${Math.max(sale.total - sale.amount_paid, 0) > 0 ? `
-          <tr>
+          ${Math.max(sale.total - sale.amount_paid, 0) > 0 ? `<tr class="bold">
             <td>Balance Due:</td>
             <td class="right">${fmt(Math.max(sale.total - sale.amount_paid, 0))} ${curr}</td>
           </tr>` : ''}
-          ${sale.change_due > 0 ? `
-          <tr>
+          ${sale.change_due > 0 ? `<tr>
             <td>Change Due:</td>
             <td class="right">${fmt(sale.change_due)} ${curr}</td>
           </tr>` : ''}
-          ${sale.customer_id ? `
-          <tr>
+          ${sale.customer_id ? `<tr>
             <td>Prev Balance:</td>
             <td class="right">${fmt(Math.max((sale.customer_balance || 0) - Math.max(sale.total - sale.amount_paid, 0), 0))} ${curr}</td>
           </tr>
@@ -350,11 +364,13 @@ async function printThermalReceipt(saleId) {
           </tr>` : ''}
         </table>
 
-        <div class="divider"></div>
-        
+        <div style="border-top: 2px solid #000; margin: 8px 0;"></div>
+        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
         <div class="footer">
-          ${receiptFooter}<br>
-          <span style="font-size: 10px; color: #111111;">Powered by Nova POS</span>
+          ${receiptFooter.toUpperCase()}<br>
+          ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : ''}
+          <br><span style="font-size: 10px; color: #111111;">Powered by Nova POS</span>
         </div>
       </body>
       </html>
@@ -445,11 +461,16 @@ async function printCartThermalReceipt() {
 
     const itemsRows = cart.map(i => `
       <tr>
-        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
+        <td style="text-align:left; padding:2px 0;"><strong>${invoiceItemName(i)}</strong></td>
+        <td style="text-align:center; padding:2px 0;"></td>
+        <td style="text-align:right; padding:2px 0;"></td>
+        <td style="text-align:right; padding:2px 0;"></td>
       </tr>
       <tr>
-        <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
-        <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+        <td style="text-align:left; padding-bottom:4px; color:#555;"></td>
+        <td style="text-align:center; padding-bottom:4px;">${i.quantity}</td>
+        <td style="text-align:right; padding-bottom:4px;">${fmt(i.unit_price)}</td>
+        <td style="text-align:right; padding-bottom:4px; font-weight:600;">${fmt(i.line_total)}</td>
       </tr>
     `).join('');
 
@@ -485,12 +506,12 @@ async function printCartThermalReceipt() {
       <body>
         <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
         ${printLogoHTML(null, 300)}
-        ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
-        ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
-        
-        <div class="divider"></div>
-        
-        <div><span class="bold">Status:</span> DRAFT RECEIPT</div>
+        ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
+
+        <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
+        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
+        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
         <div><span class="bold">Date:</span> ${sale.created_at}</div>
         <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
         <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
@@ -498,6 +519,14 @@ async function printCartThermalReceipt() {
         <div class="divider"></div>
 
         <table>
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:2px 0;">Description</th>
+              <th style="text-align:center; padding:2px 0;">Qty</th>
+              <th style="text-align:right; padding:2px 0;">Price</th>
+              <th style="text-align:right; padding:2px 0;">Total</th>
+            </tr>
+          </thead>
           <tbody>
             ${itemsRows}
           </tbody>
@@ -510,11 +539,10 @@ async function printCartThermalReceipt() {
             <td>Subtotal:</td>
             <td class="right">${fmt(sale.subtotal)} ${curr}</td>
           </tr>
-          ${sale.discount > 0 ? `
-          <tr>
-            <td>Discount:</td>
+          ${sale.discount > 0 ? `<tr>
+            <td>Discounts (N/A):</td>
             <td class="right">-${fmt(sale.discount)} ${curr}</td>
-          </tr>` : ''}
+          </tr>` : `<tr><td>Discounts (N/A):</td><td class="right">0.00 ${curr}</td></tr>`}
           <tr class="bold" style="font-size: 14px;">
             <td>TOTAL:</td>
             <td class="right">${fmt(sale.total)} ${curr}</td>
@@ -523,18 +551,15 @@ async function printCartThermalReceipt() {
             <td>Amount Paid:</td>
             <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
           </tr>
-          ${sale.balance_due > 0 ? `
-          <tr>
+          ${sale.balance_due > 0 ? `<tr class="bold">
             <td>Balance Due:</td>
             <td class="right">${fmt(sale.balance_due)} ${curr}</td>
           </tr>` : ''}
-          ${sale.change_due > 0 ? `
-          <tr>
+          ${sale.change_due > 0 ? `<tr>
             <td>Change Due:</td>
             <td class="right">${fmt(sale.change_due)} ${curr}</td>
           </tr>` : ''}
-          ${sale.customer_id ? `
-          <tr>
+          ${sale.customer_id ? `<tr>
             <td>Prev Balance:</td>
             <td class="right">${fmt(sale.prev_balance)} ${curr}</td>
           </tr>
@@ -544,11 +569,13 @@ async function printCartThermalReceipt() {
           </tr>` : ''}
         </table>
 
-        <div class="divider"></div>
-        
+        <div style="border-top: 2px solid #000; margin: 8px 0;"></div>
+        <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
         <div class="footer">
-          ${receiptFooter}<br>
-          <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+          ${receiptFooter.toUpperCase()}<br>
+          ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : '' }
+          <br><span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
         </div>
       </body>
       </html>
@@ -595,11 +622,16 @@ async function previewCartInvoice() {
 
   const itemsRows = cart.map(i => `
     <tr>
-      <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
+      <td style="text-align:left; padding:2px 0;"><strong>${invoiceItemName(i)}</strong></td>
+      <td style="text-align:center; padding:2px 0;"></td>
+      <td style="text-align:right; padding:2px 0;"></td>
+      <td style="text-align:right; padding:2px 0;"></td>
     </tr>
     <tr>
-      <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
-      <td style="text-align: right; padding-bottom: 4px; font-weight: 600;">${fmt(i.line_total)}</td>
+      <td style="text-align:left; padding-bottom:4px; color:#555;"></td>
+      <td style="text-align:center; padding-bottom:4px;">${i.quantity}</td>
+      <td style="text-align:right; padding-bottom:4px;">${fmt(i.unit_price)}</td>
+      <td style="text-align:right; padding-bottom:4px; font-weight:600;">${fmt(i.line_total)}</td>
     </tr>
   `).join('');
 
@@ -633,12 +665,12 @@ async function previewCartInvoice() {
     <body>
       <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
       ${printLogoHTML(null, 300)}
-      ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
-      ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
-      
-      <div class="divider"></div>
-      
-      <div><span class="bold">Status:</span> DRAFT RECEIPT</div>
+      ${storeAddress || storePhone ? `<div class="center" style="font-size: 11px;">${[storeAddress, storePhone ? 'Tel: ' + storePhone : null].filter(Boolean).join(', ')}</div>` : '' }
+
+      <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
+      <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
+      <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
       <div><span class="bold">Date:</span> ${sale.created_at}</div>
       <div><span class="bold">Customer:</span> ${sale.customer_name}</div>
       <div><span class="bold">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
@@ -646,6 +678,14 @@ async function previewCartInvoice() {
       <div class="divider"></div>
 
       <table>
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:2px 0;">Description</th>
+            <th style="text-align:center; padding:2px 0;">Qty</th>
+            <th style="text-align:right; padding:2px 0;">Price</th>
+            <th style="text-align:right; padding:2px 0;">Total</th>
+          </tr>
+        </thead>
         <tbody>
           ${itemsRows}
         </tbody>
@@ -658,11 +698,10 @@ async function previewCartInvoice() {
           <td>Subtotal:</td>
           <td class="right">${fmt(sale.subtotal)} ${curr}</td>
         </tr>
-        ${sale.discount > 0 ? `
-        <tr>
-          <td>Discount:</td>
+        ${sale.discount > 0 ? `<tr>
+          <td>Discounts (N/A):</td>
           <td class="right">-${fmt(sale.discount)} ${curr}</td>
-        </tr>` : ''}
+        </tr>` : `<tr><td>Discounts (N/A):</td><td class="right">0.00 ${curr}</td></tr>`}
         <tr class="bold" style="font-size: 14px;">
           <td>TOTAL:</td>
           <td class="right">${fmt(sale.total)} ${curr}</td>
@@ -671,18 +710,15 @@ async function previewCartInvoice() {
           <td>Amount Paid:</td>
           <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
         </tr>
-        ${sale.balance_due > 0 ? `
-        <tr>
+        ${sale.balance_due > 0 ? `<tr class="bold">
           <td>Balance Due:</td>
           <td class="right">${fmt(sale.balance_due)} ${curr}</td>
         </tr>` : ''}
-        ${sale.change_due > 0 ? `
-        <tr>
+        ${sale.change_due > 0 ? `<tr>
           <td>Change Due:</td>
           <td class="right">${fmt(sale.change_due)} ${curr}</td>
         </tr>` : ''}
-        ${sale.customer_id ? `
-        <tr>
+        ${sale.customer_id ? `<tr>
           <td>Prev Balance:</td>
           <td class="right">${fmt(sale.prev_balance)} ${curr}</td>
         </tr>
@@ -692,11 +728,13 @@ async function previewCartInvoice() {
         </tr>` : ''}
       </table>
 
-      <div class="divider"></div>
-      
+      <div style="border-top: 2px solid #000; margin: 8px 0;"></div>
+      <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
+
       <div class="footer">
-        ${receiptFooter}<br>
-        <span style="font-size: 10px; color: #555;">Powered by Nova POS</span>
+        ${receiptFooter.toUpperCase()}<br>
+        ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : '' }
+        <br><span style="font-size: 10px; color: #080808;">Powered by Basit | 0340 1358760</span>
       </div>
     </body>
     </html>

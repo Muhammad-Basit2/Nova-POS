@@ -180,6 +180,7 @@ body {
   transition: border-color .15s, transform .1s;
 }
 .pos-product-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.pos-product-card.pos-product-focused { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); transform: translateY(-1px); }
 .pos-product-name { font-weight: 600; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-product-urdu { color: var(--accent); font-size: 14px; line-height: 1.7; min-height: 1.7em; }
 .pos-product-price { font-weight: 700; font-size: 14px; color: var(--accent); }
@@ -292,6 +293,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  
 }
 .stat-card {
   display: flex;

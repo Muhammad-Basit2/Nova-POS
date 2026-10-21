@@ -29,8 +29,8 @@ function createSchema(db) {
       category TEXT DEFAULT '',
       cost_price REAL DEFAULT 0,
       sale_price REAL DEFAULT 0,
-      stock INTEGER DEFAULT 0,
-      min_stock INTEGER DEFAULT 0,
+      stock REAL DEFAULT 0,
+      min_stock REAL DEFAULT 0,
       unit TEXT DEFAULT 'pcs',
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now','localtime')),
@@ -89,7 +89,7 @@ function createSchema(db) {
       item_name TEXT NOT NULL,
       urdu_name TEXT DEFAULT '',
       barcode TEXT DEFAULT '',
-      quantity INTEGER DEFAULT 1,
+      quantity REAL DEFAULT 1,
       unit_price REAL DEFAULT 0,
       line_total REAL DEFAULT 0,
       FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
@@ -115,7 +115,7 @@ function createSchema(db) {
       sale_item_id INTEGER NOT NULL,
       item_id INTEGER,
       item_name TEXT NOT NULL,
-      quantity INTEGER DEFAULT 1,
+      quantity REAL DEFAULT 1,
       unit_price REAL DEFAULT 0,
       refund_amount REAL DEFAULT 0,
       condition TEXT DEFAULT 'resalable',
@@ -155,6 +155,37 @@ function createSchema(db) {
   }
   if (!db.pragma('table_info(vendors)').some((c) => c.name === 'contact_person')) {
     db.exec("ALTER TABLE vendors ADD COLUMN contact_person TEXT DEFAULT ''");
+  }
+
+  // Migrate integer quantity/stock columns to REAL for kg-weight support
+  const saleItemsInfo = db.pragma('table_info(sale_items)');
+  if (saleItemsInfo.some((c) => c.name === 'quantity' && c.type === 'INTEGER')) {
+    db.exec('ALTER TABLE sale_items RENAME COLUMN quantity TO quantity_old');
+    db.exec('ALTER TABLE sale_items ADD COLUMN quantity REAL DEFAULT 1');
+    db.exec('UPDATE sale_items SET quantity = quantity_old');
+    db.exec('ALTER TABLE sale_items DROP COLUMN quantity_old');
+  }
+
+  const returnItemsInfo = db.pragma('table_info(return_items)');
+  if (returnItemsInfo.some((c) => c.name === 'quantity' && c.type === 'INTEGER')) {
+    db.exec('ALTER TABLE return_items RENAME COLUMN quantity TO quantity_old');
+    db.exec('ALTER TABLE return_items ADD COLUMN quantity REAL DEFAULT 1');
+    db.exec('UPDATE return_items SET quantity = quantity_old');
+    db.exec('ALTER TABLE return_items DROP COLUMN quantity_old');
+  }
+
+  const itemsInfo = db.pragma('table_info(items)');
+  if (itemsInfo.some((c) => c.name === 'stock' && c.type === 'INTEGER')) {
+    db.exec('ALTER TABLE items RENAME COLUMN stock TO stock_old');
+    db.exec('ALTER TABLE items ADD COLUMN stock REAL DEFAULT 0');
+    db.exec('UPDATE items SET stock = stock_old');
+    db.exec('ALTER TABLE items DROP COLUMN stock_old');
+  }
+  if (itemsInfo.some((c) => c.name === 'min_stock' && c.type === 'INTEGER')) {
+    db.exec('ALTER TABLE items RENAME COLUMN min_stock TO min_stock_old');
+    db.exec('ALTER TABLE items ADD COLUMN min_stock REAL DEFAULT 0');
+    db.exec('UPDATE items SET min_stock = min_stock_old');
+    db.exec('ALTER TABLE items DROP COLUMN min_stock_old');
   }
 }
 

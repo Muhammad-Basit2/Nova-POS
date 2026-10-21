@@ -28,10 +28,12 @@ contextBridge.exposeInMainWorld('novaAPI', {
 
   /* ---- POS / Sales ----------------------------------------- */
   sales: {
-    create:    (saleData) => ipcRenderer.invoke('sales:create', saleData),
-    getAll:    (filters)  => ipcRenderer.invoke('sales:getAll', filters),
-    getById:   (id)       => ipcRenderer.invoke('sales:getById', id),
-    getItems:  (saleId)   => ipcRenderer.invoke('sales:getItems', saleId),
+    create:       (saleData) => ipcRenderer.invoke('sales:create', saleData),
+    getAll:       (filters)  => ipcRenderer.invoke('sales:getAll', filters),
+    getById:      (id)       => ipcRenderer.invoke('sales:getById', id),
+    getItems:     (saleId)   => ipcRenderer.invoke('sales:getItems', saleId),
+    createReturn: (data)     => ipcRenderer.invoke('sales:createReturn', data),
+    getReturns:   (saleId)   => ipcRenderer.invoke('sales:getReturns', saleId),
   },
 
   /* ---- Stock Purchases ------------------------------------- */
