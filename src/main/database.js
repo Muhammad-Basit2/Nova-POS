@@ -90,6 +90,7 @@ function createSchema(db) {
       urdu_name TEXT DEFAULT '',
       barcode TEXT DEFAULT '',
       quantity REAL DEFAULT 1,
+      unit TEXT DEFAULT '',
       unit_price REAL DEFAULT 0,
       line_total REAL DEFAULT 0,
       FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
@@ -116,6 +117,7 @@ function createSchema(db) {
       item_id INTEGER,
       item_name TEXT NOT NULL,
       quantity REAL DEFAULT 1,
+      unit TEXT DEFAULT '',
       unit_price REAL DEFAULT 0,
       refund_amount REAL DEFAULT 0,
       condition TEXT DEFAULT 'resalable',
@@ -165,6 +167,9 @@ function createSchema(db) {
     db.exec('UPDATE sale_items SET quantity = quantity_old');
     db.exec('ALTER TABLE sale_items DROP COLUMN quantity_old');
   }
+  if (!saleItemsInfo.some((c) => c.name === 'unit')) {
+    db.exec("ALTER TABLE sale_items ADD COLUMN unit TEXT DEFAULT ''");
+  }
 
   const returnItemsInfo = db.pragma('table_info(return_items)');
   if (returnItemsInfo.some((c) => c.name === 'quantity' && c.type === 'INTEGER')) {
@@ -172,6 +177,9 @@ function createSchema(db) {
     db.exec('ALTER TABLE return_items ADD COLUMN quantity REAL DEFAULT 1');
     db.exec('UPDATE return_items SET quantity = quantity_old');
     db.exec('ALTER TABLE return_items DROP COLUMN quantity_old');
+  }
+  if (!returnItemsInfo.some((c) => c.name === 'unit')) {
+    db.exec("ALTER TABLE return_items ADD COLUMN unit TEXT DEFAULT ''");
   }
 
   const itemsInfo = db.pragma('table_info(items)');

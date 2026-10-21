@@ -173,8 +173,8 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       VALUES (@invoice_no, @customer_id, @subtotal, @discount, @total, @amount_paid, @change_due, @payment_method, @status, @notes)
     `);
     const insertItem = db.prepare(`
-      INSERT INTO sale_items (sale_id, item_id, item_name, urdu_name, barcode, quantity, unit_price, line_total)
-      VALUES (@sale_id, @item_id, @item_name, @urdu_name, @barcode, @quantity, @unit_price, @line_total)
+      INSERT INTO sale_items (sale_id, item_id, item_name, urdu_name, barcode, quantity, unit, unit_price, line_total)
+      VALUES (@sale_id, @item_id, @item_name, @urdu_name, @barcode, @quantity, @unit, @unit_price, @line_total)
     `);
     const updateStock = db.prepare('UPDATE items SET stock = stock - ? WHERE id = ?');
 
@@ -187,10 +187,10 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       });
       const saleId = info.lastInsertRowid;
       for (const ci of cartItems) {
-        insertItem.run({
+      insertItem.run({
           sale_id: saleId, item_id: ci.item_id || null,
           item_name: ci.item_name, urdu_name: ci.urdu_name || '', barcode: ci.barcode || '',
-          quantity: ci.quantity, unit_price: ci.unit_price,
+          quantity: ci.quantity, unit: ci.unit || '', unit_price: ci.unit_price,
           line_total: ci.line_total
         });
         if (ci.item_id) updateStock.run(ci.quantity, ci.item_id);
@@ -794,12 +794,12 @@ function registerIpcHandlers(ipcMain, db, dialog) {
 
         // Insert return item
         db.prepare(`
-          INSERT INTO return_items (return_id, sale_item_id, item_id, item_name, quantity, unit_price, refund_amount, condition)
-          VALUES (@return_id, @sale_item_id, @item_id, @item_name, @quantity, @unit_price, @refund_amount, @condition)
+          INSERT INTO return_items (return_id, sale_item_id, item_id, item_name, quantity, unit, unit_price, refund_amount, condition)
+          VALUES (@return_id, @sale_item_id, @item_id, @item_name, @quantity, @unit, @unit_price, @refund_amount, @condition)
         `).run({
           return_id: returnId, sale_item_id: saleItem.id,
           item_id: saleItem.item_id, item_name: saleItem.item_name,
-          quantity: qtyToReturn, unit_price: saleItem.unit_price,
+          quantity: qtyToReturn, unit: saleItem.unit || '', unit_price: saleItem.unit_price,
           refund_amount: refundAmount, condition: 'resalable'
         });
 

@@ -35,7 +35,8 @@ async function refresh() {
       <td>${i.category || '—'}</td>
       <td class="num">${fmt(i.cost_price)}</td>
       <td class="num">${fmt(i.sale_price)}</td>
-      <td class="num" style="color:${lowStock ? 'var(--danger)' : 'inherit'}">${i.stock}</td>
+      <td class="num">${i.stock}</td>
+      <td>${i.unit || 'pcs'}</td>
       <td>
         <button class="btn small-btn" data-edit="${i.id}">Edit</button>
         <button class="btn danger small-btn" data-del="${i.id}">Del</button>
