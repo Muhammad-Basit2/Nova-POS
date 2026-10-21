@@ -301,7 +301,7 @@ async function printThermalReceipt(saleId) {
         <div style="border-top: 2px solid #000; margin: 6px 0;"></div>
         <div style="border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px;"></div>
 
-        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">Status: DRAFT RECEIPT</div>
+        <div style="text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #000; padding: 4px 0; margin-bottom: 8px;">RECEIPT</div>
         <div><span class="bold">Date:</span> ${sale.created_at}</div>
         <div><span class="bold">Invoice:</span> ${sale.invoice_no}</div>
         <div><span class="bold">Customer:</span> ${custDisplay}</div>
