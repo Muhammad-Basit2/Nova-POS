@@ -10,7 +10,7 @@ const XLSX = require('xlsx');
 
 /**
  * Parse an Excel (.xlsx / .xls) file and return an array of item objects.
- * Expected columns: Barcode, Name, Category,
+ * Expected columns: Barcode, Name, UrduName, Category,
  *                   CostPrice, SalePrice, Stock, MinStock, Unit
  */
 function parseItemsFromExcel(filePath) {
@@ -21,6 +21,7 @@ function parseItemsFromExcel(filePath) {
   return rows.map((r) => ({
     barcode:    String(r['Barcode'] ?? r['barcode'] ?? '').trim(),
     name:       String(r['Name'] ?? r['name'] ?? '').trim(),
+    urdu_name:  String(r['UrduName'] ?? r['urdu_name'] ?? '').trim(),
     category:   String(r['Category'] ?? r['category'] ?? '').trim(),
     cost_price: parseFloat(r['CostPrice'] ?? r['cost_price'] ?? 0) || 0,
     sale_price: parseFloat(r['SalePrice'] ?? r['sale_price'] ?? 0) || 0,
@@ -37,6 +38,7 @@ function exportItemsToBuffer(items) {
   const data = items.map((i) => ({
     Barcode:   i.barcode,
     Name:      i.name,
+    UrduName:  i.urdu_name || '',
     Category:  i.category,
     CostPrice: i.cost_price,
     SalePrice: i.sale_price,

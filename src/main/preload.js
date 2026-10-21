@@ -34,6 +34,13 @@ contextBridge.exposeInMainWorld('novaAPI', {
     getItems:  (saleId)   => ipcRenderer.invoke('sales:getItems', saleId),
   },
 
+  /* ---- Stock Purchases ------------------------------------- */
+  purchases: {
+    getAll:        ()         => ipcRenderer.invoke('purchases:getAll'),
+    create:        (data)     => ipcRenderer.invoke('purchases:create', data),
+    recordPayment: (id, data) => ipcRenderer.invoke('purchases:recordPayment', id, data),
+  },
+
   /* ---- Customers ------------------------------------------- */
   customers: {
     getAll:    ()         => ipcRenderer.invoke('customers:getAll'),
@@ -52,6 +59,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
     update:    (id, data) => ipcRenderer.invoke('vendors:update', id, data),
     delete:    (id)       => ipcRenderer.invoke('vendors:delete', id),
     getLedger: (id)       => ipcRenderer.invoke('vendors:getLedger', id),
+    addPayment: (id, data) => ipcRenderer.invoke('vendors:addPayment', id, data),
   },
 
   /* ---- Ledger Transactions --------------------------------- */
@@ -80,6 +88,13 @@ contextBridge.exposeInMainWorld('novaAPI', {
     clearInventory: () => ipcRenderer.invoke('data:clearInventory'),
     clearLedger:    () => ipcRenderer.invoke('data:clearLedger'),
     clearAll:       () => ipcRenderer.invoke('data:clearAll'),
+  },
+
+  /* ---- Invoice Logo ---------------------------------------- */
+  logo: {
+    pick:      () => ipcRenderer.invoke('logo:pick'),
+    getDataUrl:() => ipcRenderer.invoke('logo:getDataUrl'),
+    remove:    () => ipcRenderer.invoke('logo:remove'),
   },
 
   /* ---- Settings -------------------------------------------- */

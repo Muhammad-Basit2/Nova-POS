@@ -3,13 +3,49 @@
  *  src/renderer/js/pos.js
  * ============================================================ */
 
-import { toast, fmt, currency, openModal, closeModal } from './app.js';
+import { toast, fmt, currency, openModal, closeModal, printLogoHTML } from './app.js';
 
 const api = window.novaAPI;
 const $ = (sel) => document.querySelector(sel);
 
 let cart = [];
 let customers = [];
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
+function invoiceItemName(item) {
+  return `${escapeHtml(item.item_name)}${item.urdu_name
+    ? `<span class="urdu-item-name" lang="ur" dir="rtl">${escapeHtml(item.urdu_name)}</span>`
+    : ''}`;
+}
+
+function invoiceFontStyles() {
+  return `
+    @font-face {
+      font-family: 'Gulzar';
+      src: url('../../assets/fonts/Gulzar-Regular.ttf') format('truetype');
+      font-style: normal;
+      font-weight: 400;
+    }
+    .urdu-item-name {
+      display: block;
+      direction: rtl;
+      text-align: right;
+      font-family: 'Gulzar', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', serif;
+      font-size: 16px;
+      line-height: 1.8;
+      font-weight: normal;
+    }
+  `;
+}
 
 function renderCart() {
   const body = $('#cartBody');
@@ -19,7 +55,7 @@ function renderCart() {
   cart.forEach((ci, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${ci.item_name}</td>
+      <td>${invoiceItemName(ci)}</td>
       <td><input type="number" class="input small qty-input" min="1" value="${ci.quantity}" data-idx="${idx}" /></td>
       <td class="num">${fmt(ci.unit_price)}</td>
       <td class="num">${fmt(ci.line_total)}</td>
@@ -52,9 +88,10 @@ function addToCart(item) {
   if (existing) {
     existing.quantity += 1;
     existing.line_total = existing.quantity * existing.unit_price;
+    existing.urdu_name = item.urdu_name || existing.urdu_name || '';
   } else {
     cart.push({
-      item_id: item.id, item_name: item.name, barcode: item.barcode || '',
+      item_id: item.id, item_name: item.name, urdu_name: item.urdu_name || '', barcode: item.barcode || '',
       quantity: 1, unit_price: item.sale_price, line_total: item.sale_price
     });
   }
@@ -214,7 +251,7 @@ async function printThermalReceipt(saleId) {
 
     const itemsRows = items.map(i => `
       <tr>
-        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
       </tr>
       <tr>
         <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
@@ -230,6 +267,7 @@ async function printThermalReceipt(saleId) {
         <title>Receipt ${sale.invoice_no}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
+          ${invoiceFontStyles()}
           body {
             font-family: 'Courier New', Courier, monospace;
             font-size: 12px;
@@ -252,6 +290,7 @@ async function printThermalReceipt(saleId) {
       </head>
       <body>
         <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        ${printLogoHTML(null, 300)}
         ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
         ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
         
@@ -334,8 +373,9 @@ async function printThermalReceipt(saleId) {
     frameDoc.write(html);
     frameDoc.close();
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
+        await printFrame.contentDocument.fonts.ready;
         printFrame.contentWindow.focus();
         printFrame.contentWindow.print();
       } catch (e) {
@@ -405,7 +445,7 @@ async function printCartThermalReceipt() {
 
     const itemsRows = cart.map(i => `
       <tr>
-        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+        <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
       </tr>
       <tr>
         <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
@@ -421,6 +461,7 @@ async function printCartThermalReceipt() {
         <title>Receipt Draft</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
+          ${invoiceFontStyles()}
           body {
             font-family: 'Courier New', Courier, monospace;
             font-size: 12px;
@@ -443,6 +484,7 @@ async function printCartThermalReceipt() {
       </head>
       <body>
         <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+        ${printLogoHTML(null, 300)}
         ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
         ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
         
@@ -525,8 +567,9 @@ async function printCartThermalReceipt() {
     frameDoc.write(html);
     frameDoc.close();
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
+        await printFrame.contentDocument.fonts.ready;
         printFrame.contentWindow.focus();
         printFrame.contentWindow.print();
       } catch (e) {
@@ -552,7 +595,7 @@ async function previewCartInvoice() {
 
   const itemsRows = cart.map(i => `
     <tr>
-      <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${i.item_name}</strong></td>
+      <td style="text-align: left; padding: 3px 0;" colspan="2"><strong>${invoiceItemName(i)}</strong></td>
     </tr>
     <tr>
       <td style="text-align: left; padding-bottom: 4px; color: #555;">${i.quantity} x ${fmt(i.unit_price)}</td>
@@ -566,6 +609,7 @@ async function previewCartInvoice() {
     <head>
       <meta charset="UTF-8">
       <style>
+        ${invoiceFontStyles()}
         body {
           font-family: 'Courier New', Courier, monospace;
           font-size: 12px;
@@ -588,6 +632,7 @@ async function previewCartInvoice() {
     </head>
     <body>
       <div class="center bold" style="font-size: 16px; margin-bottom: 2px;">${storeName}</div>
+      ${printLogoHTML(null, 300)}
       ${storeAddress ? `<div class="center" style="font-size: 11px;">${storeAddress}</div>` : ''}
       ${storePhone ? `<div class="center" style="font-size: 11px;">Tel: ${storePhone}</div>` : ''}
       
@@ -803,7 +848,7 @@ async function viewSale(id) {
   const sale = await api.sales.getById(id);
   const items = await api.sales.getItems(id);
   const rows = items.map(i =>
-    `<tr><td>${i.item_name}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.line_total)}</td></tr>`
+    `<tr><td>${invoiceItemName(i)}</td><td class="num">${fmt(i.quantity)}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.line_total)}</td></tr>`
   ).join('');
 
   const balanceDue = Math.max(sale.total - sale.amount_paid, 0);
@@ -866,9 +911,10 @@ async function loadCatalog() {
     const card = document.createElement('div');
     card.className = 'pos-product-card';
     card.innerHTML = `
-      <div class="pos-product-name" title="${item.name}">${item.name}</div>
+      <div class="pos-product-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+      ${item.urdu_name ? `<div class="pos-product-urdu urdu-item-name" lang="ur" dir="rtl">${escapeHtml(item.urdu_name)}</div>` : ''}
       <div class="pos-product-price">${fmt(item.sale_price)} ${currency()}</div>
-      <div class="pos-product-stock">Stock: ${item.stock} ${item.unit}</div>
+      <div class="pos-product-stock">Stock: ${escapeHtml(item.stock)} ${escapeHtml(item.unit)}</div>
     `;
     card.addEventListener('click', () => {
       addToCart(item);

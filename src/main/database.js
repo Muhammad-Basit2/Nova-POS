@@ -56,6 +56,16 @@ function createSchema(db) {
       created_at TEXT DEFAULT (datetime('now','localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_no TEXT NOT NULL,
+      vendor_id INTEGER,
+      total_amount REAL NOT NULL,
+      paid_amount REAL NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL
+    );
+
     CREATE TABLE IF NOT EXISTS sales (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       invoice_no TEXT UNIQUE,
@@ -77,6 +87,7 @@ function createSchema(db) {
       sale_id INTEGER NOT NULL,
       item_id INTEGER,
       item_name TEXT NOT NULL,
+      urdu_name TEXT DEFAULT '',
       barcode TEXT DEFAULT '',
       quantity INTEGER DEFAULT 1,
       unit_price REAL DEFAULT 0,
@@ -136,8 +147,14 @@ function createSchema(db) {
   if (!db.pragma('table_info(sales)').some((c) => c.name === 'status')) {
     db.exec("ALTER TABLE sales ADD COLUMN status TEXT DEFAULT 'PAID'");
   }
+  if (!db.pragma('table_info(sale_items)').some((c) => c.name === 'urdu_name')) {
+    db.exec("ALTER TABLE sale_items ADD COLUMN urdu_name TEXT DEFAULT ''");
+  }
   if (!db.pragma('table_info(items)').some((c) => c.name === 'urdu_name')) {
     db.exec("ALTER TABLE items ADD COLUMN urdu_name TEXT DEFAULT ''");
+  }
+  if (!db.pragma('table_info(vendors)').some((c) => c.name === 'contact_person')) {
+    db.exec("ALTER TABLE vendors ADD COLUMN contact_person TEXT DEFAULT ''");
   }
 }
 

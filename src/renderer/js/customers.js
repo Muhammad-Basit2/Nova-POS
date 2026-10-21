@@ -3,7 +3,7 @@
  *  src/renderer/js/customers.js
  * ============================================================ */
 
-import { toast, openModal, closeModal, fmt } from './app.js';
+import { toast, openModal, closeModal, fmt, printLogoHTML } from './app.js';
 
 const api = window.novaAPI;
 const $ = (sel) => document.querySelector(sel);
@@ -54,6 +54,120 @@ function renderList(customers) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
+async function printDocument(title, content, paperSize, frameId) {
+  try {
+    const settings = await api.settings.getAll();
+    const storeName = escapeHtml(settings.store_name || 'Nova POS Store');
+    const storePhone = escapeHtml(settings.store_phone || '');
+    const storeAddress = escapeHtml(settings.store_address || '');
+    const footer = escapeHtml(settings.receipt_footer || 'Thank you!');
+    const bodyContent = content.replace(/\{\{currency\}\}/g, escapeHtml(settings.currency || 'Rs.'));
+    const thermal = paperSize === 'thermal';
+    const printFrame = document.getElementById(frameId) || document.createElement('iframe');
+    printFrame.id = frameId;
+    printFrame.style.cssText = 'position: fixed; width: 80mm; height: 100vh; border: none; left: -9999px; top: 0; opacity: 0; pointer-events: none;';
+    if (!printFrame.isConnected) document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${escapeHtml(title)}</title>
+        <style>
+          @page { size: ${thermal ? '80mm auto' : 'A4 portrait'}; margin: ${thermal ? '0' : '14mm'}; }
+          body { font-family: Arial, sans-serif; color: #000; background: #fff; font-size: ${thermal ? '11px' : '12px'}; ${thermal ? 'width: 72mm; margin: 0 auto; padding: 5mm;' : 'width: 100%; margin: 0;'} }
+          h1 { font-size: ${thermal ? '16px' : '20px'}; text-align: center; margin: 0 0 4px; }
+          h2 { font-size: ${thermal ? '14px' : '17px'}; text-align: center; margin: 10px 0; }
+          .center { text-align: center; }
+          .right { text-align: right; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { text-align: left; vertical-align: top; padding: ${thermal ? '4px 2px' : '7px 5px'}; border-bottom: 1px solid #bbb; }
+          th { border-bottom: 2px solid #000; }
+          .summary { margin-top: 10px; }
+          .summary td { border: 0; padding: 3px 2px; }
+          .footer { text-align: center; margin-top: 12px; }
+          ${thermal ? 'th, td { font-size: 10px; }' : ''}
+        </style>
+      </head>
+      <body>
+        <h1>${storeName}</h1>
+        ${printLogoHTML(null, 300)}
+        ${storeAddress ? `<div class="center">${storeAddress}</div>` : ''}
+        ${storePhone ? `<div class="center">Tel: ${storePhone}</div>` : ''}
+        ${bodyContent}
+        <div class="footer">${footer}<br><small>Powered by Nova POS</small></div>
+      </body>
+      </html>
+    `);
+    frameDoc.close();
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (error) {
+        console.error('Print invocation failed:', error);
+        toast('Failed to open print dialog', true);
+      }
+    }, 250);
+  } catch (error) {
+    console.error('Print preparation failed:', error);
+    toast('Failed to prepare document for printing', true);
+  }
+}
+
+function printLedgerReceipt(customer, transactions, paperSize) {
+  const currency = '{{currency}}';
+  const totalDebit = transactions
+    .filter(transaction => transaction.type === 'debit')
+    .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+  const totalCredit = transactions
+    .filter(transaction => transaction.type === 'credit')
+    .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+  const rows = transactions.length
+    ? transactions.map(transaction => `
+        <tr>
+          <td>${escapeHtml(transaction.created_at)}</td>
+          <td>${escapeHtml(transaction.type.toUpperCase())}</td>
+          <td class="right">${fmt(transaction.amount)}</td>
+          <td>${escapeHtml(transaction.description || '—')}${transaction.reference ? `<br><small>${escapeHtml(transaction.reference)}</small>` : ''}</td>
+        </tr>
+      `).join('')
+    : '<tr><td colspan="4" class="center">No transaction history</td></tr>';
+  const content = `
+    <div class="divider"></div>
+    <div><strong>Customer:</strong> ${escapeHtml(customer.name)}</div>
+    ${customer.phone ? `<div><strong>Phone:</strong> ${escapeHtml(customer.phone)}</div>` : ''}
+    <div><strong>Printed:</strong> ${escapeHtml(new Date().toLocaleString())}</div>
+    <h2>Customer Ledger</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Type</th><th class="right">Amount</th><th>Description</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <table class="summary">
+      <tr><td>Total Debit:</td><td class="right">${fmt(totalDebit)}</td></tr>
+      <tr><td>Total Credit:</td><td class="right">${fmt(totalCredit)}</td></tr>
+      <tr><td><strong>Current Balance:</strong></td><td class="right"><strong>${fmt(customer.balance)} ${currency}</strong></td></tr>
+    </table>
+  `;
+
+  printDocument(`${customer.name} — Customer Ledger`, content, paperSize, 'customerLedgerPrintFrame');
+}
+
 async function showLedgerModal(customer) {
   const txs = await api.customers.getLedger(customer.id);
   let rows = '';
@@ -84,12 +198,19 @@ async function showLedgerModal(customer) {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div class="modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end;">
+    <div class="modal-actions" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; gap: 6px;">
+        <button class="btn" id="printLedgerThermal">🖨️ Thermal Print</button>
+        <button class="btn" id="printLedgerA4">📄 A4 Print</button>
+      </div>
       <button class="btn primary" id="closeLedgerDone">Close</button>
     </div>
   `);
+
   document.getElementById('closeLedgerModalBtn').addEventListener('click', closeModal);
   document.getElementById('closeLedgerDone').addEventListener('click', closeModal);
+  document.getElementById('printLedgerThermal').addEventListener('click', () => printLedgerReceipt(customer, txs, 'thermal'));
+  document.getElementById('printLedgerA4').addEventListener('click', () => printLedgerReceipt(customer, txs, 'a4'));
 }
 
 function clearUdhaarModal(customer) {
@@ -130,28 +251,72 @@ function clearUdhaarModal(customer) {
       return;
     }
     const note = $('#clearNote').value.trim() || 'Udhaar payment received';
-    
-    await api.ledger.addTransaction({
-      entity_type: 'customer',
-      entity_id: customer.id,
-      type: 'credit',
-      amount,
-      description: note,
-      reference: 'Clear Udhaar'
-    });
+    const receivedAt = new Date().toLocaleString();
 
-    if (printReceipt) {
-      toast('Payment saved & printing receipt...');
-    } else {
-      toast('Udhaar cleared successfully');
+    try {
+      await api.ledger.addTransaction({
+        entity_type: 'customer',
+        entity_id: customer.id,
+        type: 'credit',
+        amount,
+        description: note,
+        reference: 'Clear Udhaar'
+      });
+    } catch (error) {
+      console.error('Customer payment failed:', error);
+      toast('Failed to save customer payment', true);
+      return;
     }
 
     closeModal();
-    refresh();
+    let refreshFailed = false;
+    try {
+      await refresh();
+    } catch (error) {
+      console.error('Customer list refresh failed after payment:', error);
+      refreshFailed = true;
+    }
+
+    if (printReceipt) {
+      toast(refreshFailed
+        ? 'Payment saved, but customer list refresh failed; opening receipt'
+        : 'Payment saved; opening receipt...', refreshFailed);
+      await printPaymentReceipt(customer, amount, note, receivedAt);
+    } else {
+      toast(refreshFailed
+        ? 'Payment saved, but customer list refresh failed'
+        : 'Udhaar cleared successfully', refreshFailed);
+    }
   };
 
   document.getElementById('clearSubmitBtn').addEventListener('click', () => handlePayment(false));
   document.getElementById('clearSavePrintBtn').addEventListener('click', () => handlePayment(true));
+}
+
+async function printPaymentReceipt(customer, amount, note, receivedAt) {
+  const currency = '{{currency}}';
+  const currentBalance = Number(customer.balance || 0);
+  const remainingBalance = currentBalance - amount;
+  const content = `
+    <div class="divider"></div>
+    <h2>Payment Received</h2>
+    <div><strong>Receipt Date:</strong> ${escapeHtml(receivedAt)}</div>
+    <div><strong>Customer:</strong> ${escapeHtml(customer.name)}</div>
+    ${customer.phone ? `<div><strong>Phone:</strong> ${escapeHtml(customer.phone)}</div>` : ''}
+    <div class="divider"></div>
+    <table class="summary">
+      <tr><td>Amount Received:</td><td class="right"><strong>${fmt(amount)} ${currency}</strong></td></tr>
+      <tr><td>Previous Balance:</td><td class="right">${fmt(currentBalance)} ${currency}</td></tr>
+      <tr><td>Remaining Balance:</td><td class="right"><strong>${fmt(remainingBalance)} ${currency}</strong></td></tr>
+    </table>
+    <div class="divider"></div>
+    <div><strong>Payment Details:</strong> ${escapeHtml(note)}</div>
+    <div><strong>Reference:</strong> Clear Udhaar</div>
+    <div class="divider"></div>
+    <div class="center">Received with thanks</div>
+  `;
+
+  await printDocument('Payment Received Receipt', content, 'thermal', 'customerPaymentPrintFrame');
 }
 
 function customerForm(c = null) {

@@ -48,6 +48,40 @@ export function currency() { return settings.currency || ''; }
 export function fmt(n) { return Number(n || 0).toFixed(2); }
 
 /* ============================================================
+ *  Invoice Logo helper
+ * ============================================================ */
+/* Returns HTML for the invoice logo based on the current settings
+   (logo_path/DataURL, logo_width, logo_height, logo_alignment).
+   Returns '' when no logo is configured so templates stay clean.
+   maxWidth clamps the logo for narrow thermal paper (default 80mm body = 62mm). */
+export function printLogoHTML(alignOverride, maxWidth = 280) {
+  let dataUrl = settings.logo_dataUrl || settings.logo_data_url;
+  if (!dataUrl && settings.logo_path) {
+    console.warn('invoiceLogo: logo_dataUrl not loaded, logo_path only:', settings.logo_path);
+    return '';
+  }
+  if (!dataUrl) return '';
+  const align = alignOverride || settings.logo_alignment || 'center';
+  const width = parseInt(settings.logo_width, 10) || 120;
+  const height = parseInt(settings.logo_height, 10) || 50;
+  const textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  return `<div class="invoice-logo" style="text-align:${textAlign}; margin-bottom:4px;">
+    <img src="${dataUrl}" alt="logo" style="max-width:${maxWidth}px; width:${width}px; height:${height}px; object-fit:contain;" />
+  </div>`;
+}
+
+/* Cache the data URL in the settings so printLogoHTML can use them
+   without extra async work in every template. */
+export async function refreshInvoiceLogoData() {
+  try {
+    settings.logo_dataUrl = await api.logo.getDataUrl();
+  } catch (_) {
+    settings.logo_dataUrl = '';
+  }
+  return settings.logo_dataUrl;
+}
+
+/* ============================================================
  *  View Router
  * ============================================================ */
 const viewInitializers = {
@@ -115,6 +149,46 @@ export async function loadSettingsForm() {
   document.querySelectorAll('[data-setting]').forEach(inp => {
     inp.value = settings[inp.dataset.setting] ?? '';
   });
+  await refreshInvoiceLogoData();
+  renderLogoPreview();
+}
+
+/* Show the current logo preview in Settings */
+async function renderLogoPreview() {
+  const img = $('#logoPreview');
+  const empty = $('#logoPreviewEmpty');
+  const dataUrl = await api.logo.getDataUrl();
+  if (img) {
+    img.src = dataUrl || '';
+    img.classList.toggle('hidden', !dataUrl);
+  }
+  if (empty) {
+    empty.classList.toggle('hidden', !!dataUrl);
+  }
+}
+
+async function pickLogo() {
+  const res = await api.logo.pick();
+  if (res.success) {
+    await refreshInvoiceLogoData();
+    renderLogoPreview();
+    toast('Logo selected. Click Save Settings to keep changes.');
+  } else if (res.message !== 'Cancelled') {
+    toast(res.message, true);
+  }
+}
+
+async function removeLogo() {
+  const res = await api.logo.remove();
+  if (res.success) {
+    await refreshInvoiceLogoData();
+    renderLogoPreview();
+    $('#logoWidth').value = '';
+    $('#logoHeight').value = '';
+    toast('Logo removed');
+  } else {
+    toast(res.message, true);
+  }
 }
 
 async function saveSettings() {
@@ -126,6 +200,7 @@ async function saveSettings() {
     await api.settings.set(key, value);
   }
   await loadSettings();
+  await refreshInvoiceLogoData();
   toast('Settings saved');
 }
 
@@ -172,11 +247,16 @@ async function boot() {
   initShortcuts();
 
   $('#saveSettingsBtn').addEventListener('click', saveSettings);
+  const pickLogoBtn = $('#chooseLogoBtn');
+  if (pickLogoBtn) pickLogoBtn.addEventListener('click', pickLogo);
+  const removeLogoBtn = $('#removeLogoBtn');
+  if (removeLogoBtn) removeLogoBtn.addEventListener('click', removeLogo);
   $('#modal').addEventListener('click', (e) => {
     if (e.target.id === 'modal') closeModal();
   });
 
   await loadSettings();
+  await refreshInvoiceLogoData();
   initDashboard.init();
   initPOS.init();
    initPurchases.init();

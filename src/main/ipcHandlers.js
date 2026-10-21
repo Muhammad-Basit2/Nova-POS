@@ -173,8 +173,8 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       VALUES (@invoice_no, @customer_id, @subtotal, @discount, @total, @amount_paid, @change_due, @payment_method, @status, @notes)
     `);
     const insertItem = db.prepare(`
-      INSERT INTO sale_items (sale_id, item_id, item_name, barcode, quantity, unit_price, line_total)
-      VALUES (@sale_id, @item_id, @item_name, @barcode, @quantity, @unit_price, @line_total)
+      INSERT INTO sale_items (sale_id, item_id, item_name, urdu_name, barcode, quantity, unit_price, line_total)
+      VALUES (@sale_id, @item_id, @item_name, @urdu_name, @barcode, @quantity, @unit_price, @line_total)
     `);
     const updateStock = db.prepare('UPDATE items SET stock = stock - ? WHERE id = ?');
 
@@ -189,7 +189,7 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       for (const ci of cartItems) {
         insertItem.run({
           sale_id: saleId, item_id: ci.item_id || null,
-          item_name: ci.item_name, barcode: ci.barcode || '',
+          item_name: ci.item_name, urdu_name: ci.urdu_name || '', barcode: ci.barcode || '',
           quantity: ci.quantity, unit_price: ci.unit_price,
           line_total: ci.line_total
         });
@@ -224,7 +224,107 @@ function registerIpcHandlers(ipcMain, db, dialog) {
   });
 
   ipcMain.handle('sales:getItems', (_e, saleId) => {
-    return db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(saleId);
+    return db.prepare(`
+      SELECT sale_items.*, COALESCE(NULLIF(sale_items.urdu_name, ''), items.urdu_name, '') AS urdu_name
+      FROM sale_items
+      LEFT JOIN items ON items.id = sale_items.item_id
+      WHERE sale_items.sale_id = ?
+    `).all(saleId);
+  });
+
+  /* ===========================================================
+   *  STOCK PURCHASES
+   * =========================================================== */
+  ipcMain.handle('purchases:getAll', () => {
+    return db.prepare(`
+      SELECT purchases.*, COALESCE(vendors.name, 'Deleted supplier') AS supplier_name,
+        MAX(purchases.total_amount - purchases.paid_amount, 0) AS balance_due
+      FROM purchases
+      LEFT JOIN vendors ON vendors.id = purchases.vendor_id
+      ORDER BY purchases.id DESC
+    `).all();
+  });
+  ipcMain.handle('purchases:create', (_e, data) => {
+    const vendorId = Number(data.vendor_id);
+    const totalAmount = Number(data.total_amount);
+    const paidAmount = Number(data.paid_amount || 0);
+    const invoiceNo = String(data.invoice_no || '').trim();
+
+    if (!Number.isInteger(vendorId) || !db.prepare('SELECT id FROM vendors WHERE id = ?').get(vendorId)) {
+      throw new Error('Select a valid supplier for this purchase');
+    }
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      throw new Error('Purchase total must be greater than zero');
+    }
+    if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > totalAmount) {
+      throw new Error('Paid amount must be between zero and the purchase total');
+    }
+
+    const finalInvoiceNo = invoiceNo || `PUR-${String(db.prepare('SELECT COUNT(*) AS count FROM purchases').get().count + 1).padStart(6, '0')}`;
+    const createPurchase = db.transaction(() => {
+      const vendor = db.prepare('SELECT balance FROM vendors WHERE id = ?').get(vendorId);
+      const advanceApplied = Math.min(Math.max(-vendor.balance, 0), totalAmount - paidAmount);
+      const recordedPaidAmount = paidAmount + advanceApplied;
+      const info = db.prepare(`
+        INSERT INTO purchases (invoice_no, vendor_id, total_amount, paid_amount)
+        VALUES (?, ?, ?, ?)
+      `).run(finalInvoiceNo, vendorId, totalAmount, recordedPaidAmount);
+
+      db.prepare(`
+        INSERT INTO ledger_transactions (entity_type, entity_id, type, amount, description, reference)
+        VALUES ('vendor', ?, 'debit', ?, 'Stock purchase', ?)
+      `).run(vendorId, totalAmount, finalInvoiceNo);
+      db.prepare('UPDATE vendors SET balance = balance + ? WHERE id = ?').run(totalAmount, vendorId);
+
+      if (paidAmount > 0) {
+        db.prepare(`
+          INSERT INTO ledger_transactions (entity_type, entity_id, type, amount, description, reference)
+          VALUES ('vendor', ?, 'credit', ?, 'Payment on stock purchase', ?)
+        `).run(vendorId, paidAmount, finalInvoiceNo);
+        db.prepare('UPDATE vendors SET balance = balance - ? WHERE id = ?').run(paidAmount, vendorId);
+      }
+
+      return Number(info.lastInsertRowid);
+    });
+
+    const id = createPurchase();
+    return db.prepare(`
+      SELECT purchases.*, COALESCE(vendors.name, 'Deleted supplier') AS supplier_name,
+        MAX(purchases.total_amount - purchases.paid_amount, 0) AS balance_due
+      FROM purchases LEFT JOIN vendors ON vendors.id = purchases.vendor_id
+      WHERE purchases.id = ?
+    `).get(id);
+  });
+  ipcMain.handle('purchases:recordPayment', (_e, id, data) => {
+    const purchaseId = Number(id);
+    const amount = Number(data.amount);
+    const description = String(data.description || 'Payment on stock purchase').trim();
+    if (!Number.isInteger(purchaseId)) throw new Error('Invalid purchase');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payment must be greater than zero');
+
+    const recordPayment = db.transaction(() => {
+      const purchase = db.prepare('SELECT * FROM purchases WHERE id = ?').get(purchaseId);
+      if (!purchase) throw new Error('Purchase not found');
+      if (!purchase.vendor_id) throw new Error('The supplier for this purchase is no longer available');
+      const due = Math.max(purchase.total_amount - purchase.paid_amount, 0);
+      if (amount > due) throw new Error('Payment cannot exceed the remaining balance');
+      const vendor = db.prepare('SELECT balance FROM vendors WHERE id = ?').get(purchase.vendor_id);
+      if (amount > vendor.balance) throw new Error('Payment cannot exceed the supplier payable balance');
+
+      db.prepare('UPDATE purchases SET paid_amount = paid_amount + ? WHERE id = ?').run(amount, purchaseId);
+      db.prepare(`
+        INSERT INTO ledger_transactions (entity_type, entity_id, type, amount, description, reference)
+        VALUES ('vendor', ?, 'credit', ?, ?, ?)
+      `).run(purchase.vendor_id, amount, description, purchase.invoice_no);
+      db.prepare('UPDATE vendors SET balance = balance - ? WHERE id = ?').run(amount, purchase.vendor_id);
+    });
+    recordPayment();
+    return db.prepare(`
+      SELECT purchases.*, COALESCE(vendors.name, 'Deleted supplier') AS supplier_name,
+        MAX(purchases.total_amount - purchases.paid_amount, 0) AS balance_due
+      FROM purchases LEFT JOIN vendors ON vendors.id = purchases.vendor_id
+      WHERE purchases.id = ?
+    `).get(purchaseId);
   });
 
   /* ===========================================================
@@ -256,17 +356,51 @@ function registerIpcHandlers(ipcMain, db, dialog) {
    *  VENDORS
    * =========================================================== */
   ipcMain.handle('vendors:getAll', () => {
-    return db.prepare('SELECT * FROM vendors ORDER BY name ASC').all();
+    return db.prepare(`
+      SELECT vendors.*,
+        COALESCE(SUM(CASE WHEN ledger_transactions.type = 'credit' THEN ledger_transactions.amount ELSE 0 END), 0) AS total_paid
+      FROM vendors
+      LEFT JOIN ledger_transactions
+        ON ledger_transactions.entity_type = 'vendor' AND ledger_transactions.entity_id = vendors.id
+      GROUP BY vendors.id
+      ORDER BY vendors.name ASC
+    `).all();
   });
   ipcMain.handle('vendors:getById', (_e, id) => {
     return db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
   });
   ipcMain.handle('vendors:create', (_e, data) => {
-    const info = db.prepare('INSERT INTO vendors (name,phone,address) VALUES (@name,@phone,@address)').run(data);
-    return { id: info.lastInsertRowid, ...data, balance: 0 };
+    const initialBalance = Number(data.initial_balance || 0);
+    if (!Number.isFinite(initialBalance) || initialBalance < 0) {
+      throw new Error('Initial payable balance must be a non-negative amount');
+    }
+
+    const createVendor = db.transaction(() => {
+      const info = db.prepare(`
+        INSERT INTO vendors (name,contact_person,phone,address)
+        VALUES (@name,@contact_person,@phone,@address)
+      `).run({
+        name: data.name,
+        contact_person: data.contact_person || '',
+        phone: data.phone || '',
+        address: data.address || ''
+      });
+      const id = Number(info.lastInsertRowid);
+      if (initialBalance > 0) {
+        db.prepare(`
+          INSERT INTO ledger_transactions (entity_type,entity_id,type,amount,description,reference)
+          VALUES ('vendor',?,'debit',?,'Initial payable balance','Opening balance')
+        `).run(id, initialBalance);
+        db.prepare('UPDATE vendors SET balance = balance + ? WHERE id = ?').run(initialBalance, id);
+      }
+      return db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
+    });
+
+    return createVendor();
   });
   ipcMain.handle('vendors:update', (_e, id, data) => {
-    db.prepare('UPDATE vendors SET name=@name, phone=@phone, address=@address WHERE id=@id').run({ id, ...data });
+    db.prepare('UPDATE vendors SET name=@name, contact_person=@contact_person, phone=@phone, address=@address WHERE id=@id')
+      .run({ id, ...data, contact_person: data.contact_person || '' });
     return db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
   });
   ipcMain.handle('vendors:delete', (_e, id) => {
@@ -275,6 +409,42 @@ function registerIpcHandlers(ipcMain, db, dialog) {
   });
   ipcMain.handle('vendors:getLedger', (_e, id) => {
     return db.prepare("SELECT * FROM ledger_transactions WHERE entity_type='vendor' AND entity_id=? ORDER BY created_at DESC").all(id);
+  });
+  ipcMain.handle('vendors:addPayment', (_e, id, data) => {
+    const vendorId = Number(id);
+    const amount = Number(data.amount);
+    if (!Number.isInteger(vendorId) || !db.prepare('SELECT id FROM vendors WHERE id = ?').get(vendorId)) {
+      throw new Error('Supplier not found');
+    }
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payment must be greater than zero');
+
+    const description = String(data.description || 'Supplier payment').trim();
+    const recordPayment = db.transaction(() => {
+      const vendor = db.prepare('SELECT balance FROM vendors WHERE id = ?').get(vendorId);
+      let remainingPayment = Math.min(amount, Math.max(vendor.balance, 0));
+      const openPurchases = db.prepare(`
+        SELECT id, total_amount, paid_amount
+        FROM purchases
+        WHERE vendor_id = ? AND total_amount > paid_amount
+        ORDER BY id ASC
+      `).all(vendorId);
+      const updatePurchasePaid = db.prepare('UPDATE purchases SET paid_amount = paid_amount + ? WHERE id = ?');
+      for (const purchase of openPurchases) {
+        if (remainingPayment <= 0) break;
+        const purchaseDue = purchase.total_amount - purchase.paid_amount;
+        const appliedAmount = Math.min(remainingPayment, purchaseDue);
+        updatePurchasePaid.run(appliedAmount, purchase.id);
+        remainingPayment -= appliedAmount;
+      }
+
+      db.prepare(`
+        INSERT INTO ledger_transactions (entity_type, entity_id, type, amount, description, reference)
+        VALUES ('vendor', ?, 'credit', ?, ?, '')
+      `).run(vendorId, amount, description);
+      db.prepare('UPDATE vendors SET balance = balance - ? WHERE id = ?').run(amount, vendorId);
+    });
+    recordPayment();
+    return { success: true };
   });
 
   /* ===========================================================
@@ -305,10 +475,12 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     try {
       const items = parseItemsFromExcel(filePaths[0]);
       const upsert = db.prepare(`
-        INSERT INTO items (barcode,name,category,cost_price,sale_price,stock,min_stock,unit)
-        VALUES (@barcode,@name,@category,@cost_price,@sale_price,@stock,@min_stock,@unit)
+        INSERT INTO items (barcode,name,urdu_name,category,cost_price,sale_price,stock,min_stock,unit)
+        VALUES (@barcode,@name,@urdu_name,@category,@cost_price,@sale_price,@stock,@min_stock,@unit)
         ON CONFLICT(barcode) DO UPDATE SET
-          name=excluded.name, category=excluded.category,
+          name=excluded.name,
+          urdu_name=CASE WHEN excluded.urdu_name='' THEN items.urdu_name ELSE excluded.urdu_name END,
+          category=excluded.category,
           cost_price=excluded.cost_price, sale_price=excluded.sale_price,
           stock=excluded.stock, min_stock=excluded.min_stock, unit=excluded.unit,
           updated_at=datetime('now','localtime')
@@ -476,6 +648,90 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     } catch (err) {
       return { success: false, message: err.message };
     }
+  });
+
+  /* ===========================================================
+   *  INVOICE LOGO
+   * =========================================================== */
+  const LOGO_MIME = {
+    '.png':  'image/png',
+    '.jpg':  'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif':  'image/gif',
+    '.webp': 'image/webp',
+    '.bmp':  'image/bmp',
+    '.svg':  'image/svg+xml',
+  };
+
+  function getLogoDir() {
+    const dir = path.join(app.getPath('userData'), 'logos');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  /* Return a base64 data URL so the renderer can display the image
+     without needing file:// access (works with the app CSP). */
+  function logoToDataUrl(filePath) {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const mime = LOGO_MIME[path.extname(filePath).toLowerCase()];
+    if (!mime) return null;
+    try {
+      return `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeSetting(key, value) {
+    db.prepare(`INSERT INTO settings (key,value) VALUES (?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(key, String(value));
+  }
+
+  ipcMain.handle('logo:pick', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Choose Invoice Logo',
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || !filePaths.length) return { success: false, message: 'Cancelled' };
+
+    try {
+      const source = filePaths[0];
+      const ext = path.extname(source).toLowerCase();
+      if (!LOGO_MIME[ext]) return { success: false, message: 'Unsupported image type' };
+
+      /* Keep our own copy so the logo survives if the source file moves */
+      const target = path.join(getLogoDir(), `invoice-logo-${Date.now()}${ext}`);
+      fs.copyFileSync(source, target);
+
+      /* Clean up the previously stored copy (never the user's own file) */
+      const previous = db.prepare("SELECT value FROM settings WHERE key='logo_path'").get()?.value;
+      const logoDir = getLogoDir();
+      if (previous && previous.startsWith(logoDir) && fs.existsSync(previous)) {
+        try { fs.unlinkSync(previous); } catch (_) { /* ignore */ }
+      }
+
+      writeSetting('logo_path', target);
+      return { success: true, path: target, dataUrl: logoToDataUrl(target) };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
+  ipcMain.handle('logo:getDataUrl', () => {
+    const filePath = db.prepare("SELECT value FROM settings WHERE key='logo_path'").get()?.value;
+    if (!filePath) return null;
+    return logoToDataUrl(filePath);
+  });
+
+  ipcMain.handle('logo:remove', () => {
+    const filePath = db.prepare("SELECT value FROM settings WHERE key='logo_path'").get()?.value;
+    const logoDir = getLogoDir();
+    if (filePath && filePath.startsWith(logoDir) && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+    }
+    writeSetting('logo_path', '');
+    return { success: true };
   });
 
   /* ===========================================================

@@ -74,9 +74,10 @@ npm start
 
 ## Features
 
-- **POS Cashier** – Barcode-driven item entry, quantity editing, live totals, discount support, cash/credit payment with change calculation.
+- **POS Cashier** – Barcode-driven item entry, quantity editing, live totals, discount support, cash/credit payment with change calculation, and Urdu item names printed in Gulzar font.
 - **Inventory Management** – Full CRUD for items with category filtering, stock tracking, Excel bulk import/export.
-- **Customer & Vendor Ledger** – Track receivables and payables with running balance calculations.
+- **Customer & Vendor Ledger** – Track receivables and payables with running balance calculations; print customer and supplier ledgers on thermal or A4 paper and print payment-received receipts.
+- **Supplier Purchases** – Record supplier bills, partial payments, and remaining balances; purchases and payments update the supplier ledger, with excess payments tracked as supplier advances.
 - **Sales History** – Browse, search, and filter past invoices.
 - **Database Backup & Restore** – One-click SQLite file backup with timestamped copies; restore from any backup.
 - **Offline-First** – Everything runs locally; no internet required.
