@@ -1,5 +1,5 @@
-﻿/* ============================================================
- *  Nova POS – POS Cashier Logic
+/* ============================================================
+ *  Nova POS � POS Cashier Logic
  *  src/renderer/js/pos.js
  * ============================================================ */
 
@@ -17,6 +17,16 @@ const $ = (sel) => document.querySelector(sel);
 
 let cart = [];
 let customers = [];
+let searchHighlightedIndex = -1;
+let searchResolvedItems = [];
+let catalogHighlightedIndex = -1;
+let catalogResolvedItems = [];
+let catalogColumns = 3;
+let catalogFocused = false; // true when grid navigation is active
+
+// Cart keyboard navigation state
+let cartFocusedRowIndex = -1;
+let cartFocusedFieldIndex = -1; // 0 = qty input, -1 = no focus
 
 function escapeHtml(value) {
   return String(value ?? "").replace(
@@ -67,12 +77,13 @@ function renderCart() {
 
   cart.forEach((ci, idx) => {
     const tr = document.createElement("tr");
+    tr.dataset.rowIndex = idx;
     tr.innerHTML = `
-      <td>${invoiceItemName(ci)}</td>
+      <td class="cart-item-name">${invoiceItemName(ci)}</td>
       <td><input type="number" class="input small qty-input" step="0.01" min="0.01" value="${ci.quantity}" data-idx="${idx}" /></td>
-      <td class="num">${fmt(ci.unit_price)}</td>
-      <td class="num">${fmt(ci.line_total)}</td>
-      <td><button class="btn danger small-btn" data-remove="${idx}">✕</button></td>
+      <td class="num cart-price">${fmt(ci.unit_price)}</td>
+      <td class="num cart-line-total">${fmt(ci.line_total)}</td>
+      <td><button class="btn danger small-btn" data-remove="${idx}">?</button></td>
     `;
     body.appendChild(tr);
   });
@@ -143,7 +154,7 @@ function selectCustomer(c) {
   const badge = $("#selectedCustomerBadge");
   const info = $("#selectedCustomerInfo");
   if (badge && info) {
-    info.innerHTML = `<strong>${c.name}</strong> (${c.phone || "No phone"}) — Bal: <span style="color:${c.balance > 0 ? "var(--accent)" : "inherit"}">${fmt(c.balance)}</span>`;
+    info.innerHTML = `<strong>${c.name}</strong> (${c.phone || "No phone"}) � Bal: <span style="color:${c.balance > 0 ? "var(--accent)" : "inherit"}">${fmt(c.balance)}</span>`;
     badge.classList.remove("hidden");
   }
   const walkIn = $("#walkInNameInput");
@@ -176,6 +187,16 @@ function clearCart() {
   clearSelectedCustomer();
   renderCart();
   focusBarcode();
+}
+
+const PAYMENT_METHODS = ["cash", "credit"];
+function togglePaymentMethod() {
+  const sel = $("#paymentMethod");
+  if (!sel) return;
+  const idx = PAYMENT_METHODS.indexOf(sel.value);
+  const next = PAYMENT_METHODS[(idx + 1) % PAYMENT_METHODS.length];
+  sel.value = next;
+  toast(`Payment: ${next.charAt(0).toUpperCase() + next.slice(1)}`);
 }
 
 let customerSearchTimer = null;
@@ -217,34 +238,108 @@ function focusBarcode() {
   $("#barcodeInput")?.focus();
 }
 
+function focusAmountPaid() {
+  const el = $("#amountPaidInput");
+  if (el) {
+    el.focus();
+    el.select();
+  }
+}
+
 let searchTimer = null;
 function showResults(term) {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
     const items = await api.items.search(term);
+    searchResolvedItems = items.slice(0, 12);
     const box = $("#searchResults");
     box.innerHTML = "";
-    if (!items.length) {
+    if (!searchResolvedItems.length) {
+      searchHighlightedIndex = -1;
       box.classList.add("hidden");
       return;
     }
-    items.slice(0, 12).forEach((item) => {
+    searchResolvedItems.forEach((item, idx) => {
       const div = document.createElement("div");
       div.className = "search-result-item";
+      div.dataset.index = idx;
       div.innerHTML = `<span>${item.name}</span><span>${fmt(item.sale_price)} ${currency()}</span>`;
-      div.addEventListener("click", () => {
+      div.addEventListener("click", (e) => {
+        e.stopPropagation();
         addToCart(item);
         hideResults();
         $("#barcodeInput").value = "";
+        searchHighlightedIndex = -1;
+        searchResolvedItems = [];
         focusBarcode();
       });
       box.appendChild(div);
     });
     box.classList.remove("hidden");
+    highlightResult(0);
   }, 150);
 }
 
+function highlightResult(index) {
+  const box = $("#searchResults");
+  if (!box) return;
+  const items = box.querySelectorAll(".search-result-item");
+  items.forEach((el) => el.classList.remove("search-result-focused"));
+  if (index < 0 || index >= items.length) {
+    searchHighlightedIndex = -1;
+    return;
+  }
+  searchHighlightedIndex = index;
+  const el = items[index];
+  el.classList.add("search-result-focused");
+  el.scrollIntoView({ block: "nearest" });
+}
+
+function highlightCatalogCard(index) {
+  const grid = $("#posProductsGrid");
+  if (!grid) return;
+  const cards = grid.querySelectorAll(".pos-product-card");
+  cards.forEach((el) => el.classList.remove("pos-product-focused"));
+  if (index < 0 || index >= cards.length || cards.length === 0) {
+    catalogHighlightedIndex = -1;
+    catalogFocused = false;
+    return;
+  }
+  catalogHighlightedIndex = index;
+  catalogFocused = true;
+  const card = cards[index];
+  card.classList.add("pos-product-focused");
+  card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function clearCatalogFocus() {
+  catalogHighlightedIndex = -1;
+  catalogFocused = false;
+  const grid = $("#posProductsGrid");
+  grid?.querySelectorAll(".pos-product-card").forEach((el) =>
+    el.classList.remove("pos-product-focused")
+  );
+}
+
+function detectCatalogColumns() {
+  const grid = $("#posProductsGrid");
+  const cards = grid?.querySelectorAll(".pos-product-card") || [];
+  if (cards.length === 0) return 3;
+  const firstLeft = cards[0].offsetLeft;
+  for (let i = 1; i < cards.length; i++) {
+    if (cards[i].offsetLeft !== firstLeft) return i;
+  }
+  return cards.length;
+}
+
+function getCatalogGridPos(index) {
+  const cols = Math.max(catalogColumns, 1);
+  return { row: Math.floor(index / cols), col: index % cols, cols };
+}
+
 function hideResults() {
+  searchHighlightedIndex = -1;
+  searchResolvedItems = [];
   $("#searchResults").classList.add("hidden");
 }
 
@@ -880,7 +975,7 @@ async function previewCartInvoice() {
   `;
 
   openModal(`
-    <h3 style="margin-bottom: 10px;">📋 Invoice Preview (Draft)</h3>
+    <h3 style="margin-bottom: 10px;">🧾 Invoice Preview (Draft)</h3>
     <div style="background: #fff; border-radius: 8px; padding: 0; display: flex; justify-content: center; max-height: 60vh; overflow-y: auto;">
       <iframe id="invoicePreviewFrame" style="width: 82mm; min-height: 420px; border: none; background: #fff; border-radius: 8px;" scrolling="no"></iframe>
     </div>
@@ -989,7 +1084,7 @@ async function completeSale() {
   });
 
   if (sale) {
-    toast(`Sale completed — Invoice ${sale.invoice_no}`);
+    toast(`Sale completed � Invoice ${sale.invoice_no}`);
     clearCart();
     loadCatalog();
 
@@ -1123,9 +1218,10 @@ async function loadCatalog() {
   const empty = $("#posProductsEmpty");
   if (empty) empty.classList.toggle("hidden", items.length > 0);
 
-  items.forEach((item) => {
+  items.forEach((item, idx) => {
     const card = document.createElement("div");
     card.className = "pos-product-card";
+    card.dataset.index = idx;
     card.innerHTML = `
       <div class="pos-product-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
       ${item.urdu_name ? `<div class="pos-product-urdu urdu-item-name" lang="ur" dir="rtl">${escapeHtml(item.urdu_name)}</div>` : ""}
@@ -1138,6 +1234,12 @@ async function loadCatalog() {
     });
     grid.appendChild(card);
   });
+
+  catalogResolvedItems = items;
+  catalogColumns = detectCatalogColumns();
+  // Do NOT auto-highlight; user presses ArrowDown/Right from search to enter grid mode
+  catalogHighlightedIndex = -1;
+  catalogFocused = false;
 
   const cats = await api.items.getCategories();
   const catSel = $("#posCategoryFilter");
@@ -1152,14 +1254,64 @@ async function loadCatalog() {
 
 function init() {
   $("#barcodeInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
+    const resultsBox = $("#searchResults");
+    const hasOpenResults = resultsBox && !resultsBox.classList.contains("hidden");
+    const resultCount = searchResolvedItems.length;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (hasOpenResults && resultCount > 0) {
+        const next = searchHighlightedIndex < 0 ? 0 : (searchHighlightedIndex + 1) % resultCount;
+        highlightResult(next);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (hasOpenResults && resultCount > 0) {
+        const prev = searchHighlightedIndex <= 0 ? resultCount - 1 : searchHighlightedIndex - 1;
+        highlightResult(prev);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (hasOpenResults && resultCount > 0) {
+        // If there's only one result and no highlight yet, or highlight is at index 0, add it directly
+        let itemIdx = searchHighlightedIndex;
+        if (resultCount === 1) {
+          // Single result: add immediately without needing arrow down
+          const item = searchResolvedItems[0];
+          addToCart(item);
+          $("#barcodeInput").value = "";
+          searchHighlightedIndex = -1;
+          searchResolvedItems = [];
+          resultsBox.classList.add("hidden");
+          focusBarcode();
+          return;
+        }
+        if (itemIdx < 0) itemIdx = 0;
+        const item = searchResolvedItems[itemIdx];
+        addToCart(item);
+        $("#barcodeInput").value = "";
+        searchHighlightedIndex = -1;
+        searchResolvedItems = [];
+        resultsBox.classList.add("hidden");
+        focusBarcode();
+      } else {
+        hideResults();
+        tryBarcodeSubmit(e.target.value.trim());
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      searchHighlightedIndex = -1;
       hideResults();
-      tryBarcodeSubmit(e.target.value.trim());
+      focusBarcode();
     }
   });
   $("#barcodeInput").addEventListener("input", (e) => {
-    if (e.target.value.trim()) showResults(e.target.value.trim());
-    else hideResults();
+    if (e.target.value.trim()) {
+      searchHighlightedIndex = -1;
+      showResults(e.target.value.trim());
+    } else {
+      hideResults();
+    }
   });
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".pos-toolbar")) hideResults();
@@ -1172,6 +1324,108 @@ function init() {
   $("#cartBody").addEventListener("change", (e) => {
     if (e.target.classList.contains("qty-input"))
       setQuantity(Number(e.target.dataset.idx), e.target.value);
+  });
+
+  // Cart keyboard navigation
+  function highlightCartRow(idx) {
+    const rows = $("#cartBody").querySelectorAll("tr");
+    rows.forEach((r, i) => {
+      r.classList.toggle("cart-row-focused", i === idx);
+      const inp = r.querySelector(".qty-input");
+      if (inp) inp.classList.toggle("qty-input-focused", i === idx);
+    });
+    cartFocusedRowIndex = idx;
+    if (idx >= 0 && rows[idx]) {
+      rows[idx].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function focusCartRowInput(idx) {
+    const rows = $("#cartBody").querySelectorAll("tr");
+    rows.forEach((r) => {
+      r.classList.remove("cart-row-focused");
+      const inp = r.querySelector(".qty-input");
+      if (inp) inp.classList.remove("qty-input-focused");
+    });
+    cartFocusedRowIndex = idx;
+    cartFocusedFieldIndex = 0;
+    if (idx >= 0 && idx < rows.length) {
+      const inp = rows[idx].querySelector(".qty-input");
+      if (inp) {
+        inp.focus();
+        inp.select();
+        inp.classList.add("qty-input-focused");
+        rows[idx].classList.add("cart-row-focused");
+        rows[idx].scrollIntoView({ block: "nearest" });
+      }
+    }
+  }
+
+  function clearCartFocus() {
+    const rows = $("#cartBody").querySelectorAll("tr");
+    rows.forEach((r) => {
+      r.classList.remove("cart-row-focused");
+      const inp = r.querySelector(".qty-input");
+      if (inp) inp.classList.remove("qty-input-focused");
+    });
+    cartFocusedRowIndex = -1;
+    cartFocusedFieldIndex = -1;
+  }
+
+  $("#cartBody").addEventListener("keydown", (e) => {
+    if (cartFocusedRowIndex < 0) return;
+    const rows = $("#cartBody").querySelectorAll("tr");
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = cartFocusedRowIndex < rows.length - 1 ? cartFocusedRowIndex + 1 : 0;
+      highlightCartRow(next);
+      const inp = rows[next].querySelector(".qty-input");
+      if (inp) { inp.focus(); inp.select(); }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = cartFocusedRowIndex > 0 ? cartFocusedRowIndex - 1 : rows.length - 1;
+      highlightCartRow(prev);
+      const inp = rows[prev].querySelector(".qty-input");
+      if (inp) { inp.focus(); inp.select(); }
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      removeFromCart(cartFocusedRowIndex);
+      const remaining = $("#cartBody").querySelectorAll("tr");
+      const newRowIdx = Math.min(cartFocusedRowIndex, remaining.length - 1);
+      if (newRowIdx >= 0) {
+        highlightCartRow(newRowIdx);
+        const inp = remaining[newRowIdx].querySelector(".qty-input");
+        if (inp) { inp.focus(); inp.select(); }
+      } else {
+        clearCartFocus();
+        focusBarcode();
+      }
+    } else if (e.key === "ArrowRight" || e.key === "Tab") {
+      e.preventDefault();
+      // Move from last row to complete sale flow
+      if (e.key === "Tab") {
+        clearCartFocus();
+        focusAmountPaid();
+      }
+    }
+  });
+
+  // Qty input keydown handlers (Enter applies and returns to search)
+  document.addEventListener("keydown", (e) => {
+    if (e.target.classList.contains("qty-input")) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const idx = Number(e.target.dataset.idx);
+        setQuantity(idx, e.target.value);
+        clearCartFocus();
+        focusBarcode();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.target.blur();
+        clearCartFocus();
+        focusBarcode();
+      }
+    }
   });
 
   $("#customerSearchInput")?.addEventListener("input", (e) => {
@@ -1187,12 +1441,114 @@ function init() {
     }
   });
   $("#amountPaidInput").addEventListener("input", recalcChange);
+  $("#amountPaidInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      completeSale();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.target.blur();
+      focusBarcode();
+    }
+  });
   $("#completeSaleBtn").addEventListener("click", completeSale);
   $("#previewInvoiceBtn").addEventListener("click", previewCartInvoice);
   $("#printCartBtn").addEventListener("click", printCartThermalReceipt);
   $("#clearCartBtn").addEventListener("click", clearCart);
 
+  // -- Catalog grid keyboard navigation ----------------------------------
+  // Search-input handler: arrow keys enter/navigate grid; Enter adds to cart
   $("#posCatalogSearch")?.addEventListener("input", loadCatalog);
+  $("#posCatalogSearch")?.addEventListener("keydown", (e) => {
+    const total = catalogResolvedItems.length;
+    if (total === 0) return;
+
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      e.preventDefault();
+      if (!catalogFocused) {
+        // Enter grid mode from search bar
+        highlightCatalogCard(0);
+      } else {
+        // Navigate grid: move down one row or right one column
+        const pos = getCatalogGridPos(catalogHighlightedIndex);
+        const downIdx = catalogHighlightedIndex + pos.cols;
+        if (downIdx < total) {
+          highlightCatalogCard(downIdx);
+        } else {
+          // At last row � move right within row, or wrap to first of next row
+          const rightIdx = catalogHighlightedIndex + 1;
+          if (rightIdx < total && rightIdx % pos.cols !== 0) {
+            highlightCatalogCard(rightIdx);
+          }
+        }
+      }
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (catalogFocused) {
+        const pos = getCatalogGridPos(catalogHighlightedIndex);
+        if (e.key === "ArrowUp") {
+          const upIdx = catalogHighlightedIndex - pos.cols;
+          if (upIdx >= 0) highlightCatalogCard(upIdx);
+        } else {
+          // ArrowLeft
+          if (pos.col > 0) highlightCatalogCard(catalogHighlightedIndex - 1);
+        }
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (catalogFocused && catalogHighlightedIndex >= 0) {
+        const item = catalogResolvedItems[catalogHighlightedIndex];
+        addToCart(item);
+        // Keep highlight so user can hit Enter again to increment quantity
+        highlightCatalogCard(catalogHighlightedIndex);
+      } else if (!catalogFocused) {
+        // From search bar with no grid focus � enter grid mode on first item
+        highlightCatalogCard(0);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      clearCatalogFocus();
+      focusBarcode();
+    }
+  });
+
+  // Document-level fallback: handles grid navigation when focus leaves search input
+  document.addEventListener("keydown", (e) => {
+    if (e.target.id === "posCatalogSearch") return;
+    if (!catalogFocused || catalogResolvedItems.length === 0) return;
+    const total = catalogResolvedItems.length;
+    const pos = getCatalogGridPos(catalogHighlightedIndex);
+
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (pos.col < pos.cols - 1 && catalogHighlightedIndex + 1 < total) {
+        highlightCatalogCard(catalogHighlightedIndex + 1);
+      }
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (pos.col > 0 && catalogHighlightedIndex - 1 >= 0) {
+        highlightCatalogCard(catalogHighlightedIndex - 1);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const down = catalogHighlightedIndex + pos.cols;
+      if (down < total) highlightCatalogCard(down);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const up = catalogHighlightedIndex - pos.cols;
+      if (up >= 0) highlightCatalogCard(up);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = catalogResolvedItems[catalogHighlightedIndex];
+      addToCart(item);
+      highlightCatalogCard(catalogHighlightedIndex);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      clearCatalogFocus();
+      focusBarcode();
+    }
+  });
+
   $("#posCategoryFilter")?.addEventListener("change", loadCatalog);
 
   $("#salesFilterBtn").addEventListener("click", loadSalesHistory);
@@ -1204,6 +1560,60 @@ function init() {
 
   loadCustomers();
   focusBarcode();
+
+  // Global POS keyboard shortcuts
+  function posKeydown(e) {
+    if (!$("#view-pos").classList.contains("active")) return;
+    // Don't intercept when user is typing in inputs (except for dedicated shortcut keys)
+    const inInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable;
+
+    if (e.key === "F1") {
+      e.preventDefault();
+      clearCartFocus();
+      focusBarcode();
+      return;
+    }
+    if (e.key === "F2") {
+      e.preventDefault();
+      focusAmountPaid();
+      return;
+    }
+    if (e.key === "F3") {
+      e.preventDefault();
+      togglePaymentMethod();
+      return;
+    }
+    if (e.key === "F9") {
+      e.preventDefault();
+      completeSale();
+      return;
+    }
+    // Esc: clear search results or close modals, return to barcode
+    if (e.key === "Escape") {
+      if ($("#modal") && !$("#modal").classList.contains("hidden")) return; // let app.js handle modal close
+      if (searchResolvedItems.length > 0) {
+        e.preventDefault();
+        searchHighlightedIndex = -1;
+        hideResults();
+        focusBarcode();
+        return;
+      }
+      if (catalogFocused) {
+        e.preventDefault();
+        clearCatalogFocus();
+        focusBarcode();
+        return;
+      }
+      if (cartFocusedRowIndex >= 0) {
+        e.preventDefault();
+        clearCartFocus();
+        focusBarcode();
+        return;
+      }
+    }
+  }
+
+  document.addEventListener("keydown", posKeydown);
 }
 
 export const initPOS = {
@@ -1215,5 +1625,9 @@ export const initPOS = {
   clearCart,
   completeSale,
   focusBarcode,
+  focusAmountPaid,
+  togglePaymentMethod,
   loadSalesHistory,
 };
+
+

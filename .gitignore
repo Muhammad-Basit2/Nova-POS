@@ -5,3 +5,5 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+fix_cust.js
+temp_*.js

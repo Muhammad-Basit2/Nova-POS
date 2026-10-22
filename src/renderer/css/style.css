@@ -180,7 +180,13 @@ body {
   transition: border-color .15s, transform .1s;
 }
 .pos-product-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-.pos-product-card.pos-product-focused { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); transform: translateY(-1px); }
+.pos-product-card.pos-product-focused {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 4px 12px rgba(0,0,0,.4);
+  transform: translateY(-2px) scale(1.02);
+  z-index: 10;
+  position: relative;
+}
 .pos-product-name { font-weight: 600; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-product-urdu { color: var(--accent); font-size: 14px; line-height: 1.7; min-height: 1.7em; }
 .pos-product-price { font-weight: 700; font-size: 14px; color: var(--accent); }
@@ -196,6 +202,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .search-result-item:hover { background: var(--accent); color: #fff; }
+.search-result-item.search-result-focused { background: var(--accent); color: #fff; font-weight: 600; }
 
 .pos-right { display: flex; flex-direction: column; }
 .totals { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
@@ -408,4 +415,37 @@ body {
   .settings-panel { flex-direction: column; }
   .settings-form { flex: none; width: 100%; max-width: none; }
   .settings-info-card { flex: none; width: 100%; }
+}
+
+/* ============================================================
+ *  Keyboard Navigation Focus Styles
+ * ============================================================ */
+.search-result-focused {
+  background: var(--accent) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.cart-row-focused {
+  background: rgba(79, 140, 255, 0.18) !important;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.cart-row-focused .cart-item-name {
+  color: var(--accent-h);
+  font-weight: 600;
+}
+
+.qty-input-focused {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent-h) !important;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.4);
+}
+
+/* Prevent default arrow-key page scrolling */
+input[type="number"], input[type="text"], select {
+  scroll-behavior: auto;
 }

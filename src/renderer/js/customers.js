@@ -335,9 +335,10 @@ function customerForm(c = null) {
       <button class="btn primary" id="c-save">Save Customer</button>
     </div>
   `);
+  const saveBtn = document.getElementById('c-save');
   document.getElementById('closeCustModalX').addEventListener('click', closeModal);
   document.getElementById('c-cancel').addEventListener('click', closeModal);
-  document.getElementById('c-save').addEventListener('click', async () => {
+  saveBtn.addEventListener('click', async () => {
     const data = {
       name: $('#c-name').value.trim(),
       phone: $('#c-phone').value.trim(),
@@ -345,14 +346,27 @@ function customerForm(c = null) {
       address: $('#c-address').value.trim()
     };
     if (!data.name) { toast('Customer name is required', true); return; }
-    if (isEdit) {
-      await api.customers.update(c.id, data);
-    } else {
-      await api.customers.create(data);
+    saveBtn.disabled = true;
+    try {
+      if (isEdit) {
+        await api.customers.update(c.id, data);
+      } else {
+        await api.customers.create(data);
+      }
+    } catch (error) {
+      console.error('Customer save failed:', error);
+      toast('Failed to save customer', true);
+      saveBtn.disabled = false;
+      return;
     }
     closeModal();
     toast('Customer saved successfully');
-    refresh();
+    try {
+      await refresh();
+    } catch (error) {
+      console.error('Customer list refresh failed:', error);
+      toast('Customer saved, but the list could not be refreshed', true);
+    }
   });
 }
 
@@ -363,32 +377,58 @@ function init() {
   });
 
   $('#customerEntityBody')?.addEventListener('click', async (e) => {
-    const editId = e.target.dataset.edit;
-    const delId = e.target.dataset.del;
-    const clearId = e.target.dataset.clear;
-    const ledgerId = e.target.dataset.ledger;
+    const button = e.target.closest('button');
+    if (!button) return;
+    const editId = button.dataset.edit;
+    const delId = button.dataset.del;
+    const clearId = button.dataset.clear;
+    const ledgerId = button.dataset.ledger;
 
+    if (ledgerId) {
+      try {
+        const cust = await api.customers.getById(Number(ledgerId));
+        if (cust) showLedgerModal(cust);
+      } catch (error) {
+        console.error('Could not open customer ledger:', error);
+        toast('Could not open customer ledger', true);
+      }
+      return;
+    }
     if (editId) {
-      const c = await api.customers.getById(Number(editId));
-      if (c) customerForm(c);
+      try {
+        const cust = await api.customers.getById(Number(editId));
+        if (cust) customerForm(cust);
+      } catch (error) {
+        console.error('Could not load customer for editing:', error);
+        toast('Could not open customer details', true);
+      }
     }
     if (clearId) {
-      const c = await api.customers.getById(Number(clearId));
-      if (c) clearUdhaarModal(c);
-    }
-    if (ledgerId) {
-      const c = await api.customers.getById(Number(ledgerId));
-      if (c) showLedgerModal(c);
+      try {
+        const cust = await api.customers.getById(Number(clearId));
+        if (cust) clearUdhaarModal(cust);
+      } catch (error) {
+        console.error('Could not open clear udhaar modal:', error);
+        toast('Could not open clear udhaar', true);
+      }
     }
     if (delId) {
       if (!confirm('Are you sure you want to remove this customer?')) return;
-      await api.customers.delete(Number(delId));
-      toast('Customer removed');
-      refresh();
+      try {
+        await api.customers.delete(Number(delId));
+        toast('Customer removed');
+        await refresh();
+      } catch (error) {
+        console.error('Customer deletion failed:', error);
+        toast('Failed to delete customer', true);
+      }
     }
   });
 
-  refresh();
+  refresh().catch(error => {
+    console.error('Customer list load failed:', error);
+    toast('Could not load customers', true);
+  });
 }
 
 export const initCustomers = { init, refresh };

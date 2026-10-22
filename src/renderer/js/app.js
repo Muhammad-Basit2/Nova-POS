@@ -223,17 +223,29 @@ function startClock() {
 function initShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeModal(); initPOS.focusBarcode(); return; }
+    const inPosView = $('#view-pos').classList.contains('active');
     switch (e.key) {
-      case 'F1': e.preventDefault(); switchView('dashboard'); break;
-      case 'F2': e.preventDefault(); switchView('pos'); break;
-      case 'F3': e.preventDefault(); switchView('inventory'); break;
+      case 'F1':
+        e.preventDefault();
+        if (inPosView) { initPOS.focusBarcode?.(); } else { switchView('dashboard'); }
+        break;
+      case 'F2':
+        e.preventDefault();
+        if (inPosView) { initPOS.focusAmountPaid?.(); } else { switchView('pos'); }
+        break;
+      case 'F3':
+        e.preventDefault();
+        if (inPosView) { initPOS.togglePaymentMethod?.(); } else { switchView('inventory'); }
+        break;
       case 'F4': e.preventDefault(); switchView('purchases'); break;
       case 'F5': e.preventDefault(); switchView('sales'); break;
       case 'F6': e.preventDefault(); switchView('customers'); break;
       case 'F7': e.preventDefault(); switchView('suppliers'); break;
       case 'F8': e.preventDefault(); switchView('settings', 'backup'); break;
-      case 'F8': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.clearCart?.(); } break;
-      case 'F9': if ($('#view-pos').classList.contains('active')) { e.preventDefault(); initPOS.completeSale?.(); } break;
+      case 'F9':
+        e.preventDefault();
+        if (inPosView) { initPOS.completeSale?.(); }
+        break;
     }
   });
 }
