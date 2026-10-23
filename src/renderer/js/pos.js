@@ -83,7 +83,7 @@ function renderCart() {
       <td><input type="number" class="input small qty-input" step="0.01" min="0.01" value="${ci.quantity}" data-idx="${idx}" /></td>
       <td class="num cart-price">${fmt(ci.unit_price)}</td>
       <td class="num cart-line-total">${fmt(ci.line_total)}</td>
-      <td><button class="btn danger small-btn" data-remove="${idx}">?</button></td>
+      <td><button class="btn danger small-btn" data-remove="${idx}">✘</button></td>
     `;
     body.appendChild(tr);
   });
@@ -1138,7 +1138,11 @@ async function loadSalesHistory() {
       <td>${custDisplay}</td>
       <td class="num">${fmt(s.total)}</td><td class="num">${fmt(s.amount_paid)}</td>
       <td>${s.payment_method}</td>
-      <td><button class="btn small-btn" data-view-sale="${s.id}">View</button></td>
+      <td><span class="return-badge ${s.status === 'PARTIAL_RETURN' ? 'PARTIAL_RETURN' : s.status === 'RETURNED' ? 'RETURNED' : ''}">${s.status || 'PAID'}</span></td>
+      <td>
+        <button class="btn small-btn" data-view-sale="${s.id}">View</button>
+        ${(s.status === 'PAID' || s.status === 'PARTIAL_RETURN') ? `<button class="btn small-btn" style="color:var(--warning)" data-return-sale="${s.id}">🔄 Return</button>` : ''}
+      </td>
     `;
     body.appendChild(tr);
   });
@@ -1147,6 +1151,7 @@ async function loadSalesHistory() {
 async function viewSale(id) {
   const sale = await api.sales.getById(id);
   const items = await api.sales.getItems(id);
+  const returns = await api.sales.getReturns(id);
   const rows = items
     .map(
       (i) =>
@@ -1158,10 +1163,28 @@ async function viewSale(id) {
   const currBal = sale.customer_balance || 0;
   const prevBal = sale.customer_id ? Math.max(currBal - balanceDue, 0) : 0;
 
+  const returnsHtml = returns.length > 0
+    ? `<details style="margin-top:10px">
+        <summary style="cursor:pointer;color:var(--accent);font-weight:600">🔄 Returns (${returns.length}) — Total refunded: ${fmt(returns.reduce((s,r)=>s+r.total_refund,0))}</summary>
+        <table class="table" style="margin-top:6px;font-size:12px">
+          <thead><tr><th>Return #</th><th>Date</th><th>Items</th><th>Refund</th></tr></thead>
+          <tbody>
+            ${returns.map(r => `<tr>
+              <td>${r.return_no}</td>
+              <td>${r.created_at}</td>
+              <td>${r.items_summary || '—'}</td>
+              <td class="num" style="color:var(--success)">${fmt(r.total_refund)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </details>`
+    : '';
+
   openModal(`
     <h3>Invoice ${sale.invoice_no} (${sale.status || "PAID"})</h3>
     <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 8px;">Customer: <strong>${sale.customer_name || "Walk-in"}</strong></p>
     <table class="table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
+    ${returnsHtml}
     <div class="totals" style="margin-top:10px">
       <div class="row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
       ${sale.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(sale.discount)}</span></div>` : ""}
@@ -1181,6 +1204,7 @@ async function viewSale(id) {
     </div>
     <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
       <button class="btn primary" id="printThermalBtn">🖨️ Thermal Print</button>
+      ${(sale.status === 'PAID' || sale.status === 'PARTIAL_RETURN') ? `<button class="btn" style="color:var(--warning)" id="returnItemsBtn">🔄 Return Items</button>` : ''}
       <button class="btn" id="closeSaleModal">Close</button>
     </div>
   `);
@@ -1190,6 +1214,106 @@ async function viewSale(id) {
   document
     .getElementById("printThermalBtn")
     .addEventListener("click", () => printThermalReceipt(sale.id));
+  const returnBtn = document.getElementById("returnItemsBtn");
+  if (returnBtn) {
+    returnBtn.addEventListener("click", () => openReturnModal(sale, items));
+  }
+}
+
+async function openReturnModalForSale(saleId) {
+  const sale = await api.sales.getById(saleId);
+  const items = await api.sales.getItems(saleId);
+  openReturnModal(sale, items);
+}
+
+function openReturnModal(sale, items) {
+  const existingReturns = items.map(i => ({
+    sale_item_id: i.id,
+    item_name: i.item_name,
+    quantity_sold: i.quantity,
+    unit: i.unit || '',
+    unit_price: i.unit_price,
+    max_return: i.quantity,
+    return_qty: 0,
+    refund_amount: 0,
+  }));
+
+  const rowsHtml = existingReturns.map((item, idx) => `
+    <tr data-idx="${idx}">
+      <td>${invoiceItemName(item)}</td>
+      <td class="num">${fmt(item.quantity_sold)}${item.unit ? ' ' + item.unit : ''}</td>
+      <td class="num">${fmt(item.max_return)}</td>
+      <td><input type="number" class="input small return-qty-input" step="0.01" min="0" max="${item.max_return}" value="0" data-sale-item-id="${item.sale_item_id}" data-unit-price="${item.unit_price}" /></td>
+      <td class="num return-refund-amount" data-idx="${idx}">0.00</td>
+    </tr>
+  `).join('');
+
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">🔄 Return Items — Invoice ${sale.invoice_no}</h3>
+      <button class="btn small-btn" id="closeReturnModalX">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">
+      Max refund: <strong style="color:var(--success)">${fmt(sale.total)}</strong> · Payment: ${sale.payment_method.toUpperCase()}
+    </p>
+    <table class="table" id="returnItemsTable">
+      <thead><tr><th>Item</th><th>Qty Sold</th><th>Max Return</th><th>Refund Qty</th><th>Refund Amount</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="totals" style="margin-top:10px">
+      <div class="row grand"><span>Total Refund</span><span id="returnTotalRefund">0.00</span></div>
+    </div>
+    <label style="display:block;margin-top:10px;font-size:13px;color:var(--text-dim)">
+      Notes <input class="input" id="returnNotes" placeholder="Optional note" />
+    </label>
+    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" id="returnConfirmBtn">✅ Confirm Return</button>
+      <button class="btn" id="closeReturnModalBtn">Cancel</button>
+    </div>
+  `);
+
+  document.getElementById('closeReturnModalX').addEventListener('click', closeModal);
+  document.getElementById('closeReturnModalBtn').addEventListener('click', closeModal);
+
+  const inputs = document.querySelectorAll('.return-qty-input');
+  const totalEl = document.getElementById('returnTotalRefund');
+  let totalRefund = 0;
+
+  inputs.forEach(inp => {
+    inp.addEventListener('input', () => {
+      const saleItemId = Number(inp.dataset.saleItemId);
+      const unitPrice = parseFloat(inp.dataset.unitPrice);
+      const qty = parseFloat(inp.value) || 0;
+      const refundAmount = qty * unitPrice;
+      inp.closest('tr').querySelector('.return-refund-amount').textContent = fmt(refundAmount);
+      totalRefund = Array.from(inputs).reduce((s, i) => s + ((parseFloat(i.value) || 0) * parseFloat(i.dataset.unitPrice)), 0);
+      totalEl.textContent = fmt(totalRefund);
+    });
+  });
+
+  document.getElementById('returnConfirmBtn')?.addEventListener('click', async () => {
+    const returnItems = Array.from(inputs)
+      .filter(inp => (parseFloat(inp.value) || 0) > 0)
+      .map(inp => ({
+        sale_item_id: Number(inp.dataset.saleItemId),
+        quantity: parseFloat(inp.value) || 0,
+      }));
+
+    if (returnItems.length === 0) {
+      toast('Please select at least one item to return', true);
+      return;
+    }
+
+    const notes = document.getElementById('returnNotes')?.value || '';
+    const res = await api.sales.createReturn({ saleId: sale.id, returnItems, notes });
+    if (res && res.return_no) {
+      toast(`Return ${res.return_no} created — ${fmt(res.totalRefund)} refunded`);
+      closeModal();
+      loadSalesHistory();
+    } else {
+      toast(res?.message || 'Return failed', true);
+    }
+  });
 }
 
 async function loadCustomers() {
@@ -1555,7 +1679,9 @@ function init() {
   $("#salesRefreshBtn").addEventListener("click", loadSalesHistory);
   $("#salesBody").addEventListener("click", (e) => {
     const id = e.target.dataset.viewSale;
-    if (id) viewSale(Number(id));
+    if (id) { viewSale(Number(id)); return; }
+    const retId = e.target.dataset.returnSale;
+    if (retId) openReturnModalForSale(Number(retId));
   });
 
   loadCustomers();

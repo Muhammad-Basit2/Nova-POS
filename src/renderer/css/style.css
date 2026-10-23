@@ -45,6 +45,12 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ---------- Scrollbars (global) ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-alt); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
 body {
   font-family: var(--font);
   background: var(--bg);
@@ -139,6 +145,10 @@ body {
 
 /* ---------- Tables ---------- */
 .table-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+.table-wrap::-webkit-scrollbar { width: 8px; }
+.table-wrap::-webkit-scrollbar-track { background: var(--bg-alt); border-radius: 4px; }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.table-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th {
   position: sticky; top: 0; z-index: 1;
@@ -163,7 +173,7 @@ body {
 .pos-left { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .pos-toolbar { position: relative; }
 .pos-catalog { display: flex; flex-direction: column; min-height: 0; }
-.pos-products-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+.pos-products-wrap { flex: 1; overflow-y: auto; min-height: 0;  }
 .pos-products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -292,8 +302,8 @@ body {
 .supplier-modal-form .input { margin-top: 10px; padding: 14px 16px; font-size: 16px; }
 .supplier-modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 18px 28px; border-top: 1px solid var(--border); }
 .supplier-modal-footer .btn { padding: 12px 20px; font-size: 16px; font-weight: 600; }
-.supplier-save-btn { background: #087f75 !important; border-color: #087f75 !important; }
-.supplier-save-btn:hover { background: #09978a !important; }
+.supplier-save-btn { background: #4f8cff !important; border-color: #4f8cff !important; }
+.supplier-save-btn:hover { background: #6ea3ff !important; }
 
 /* ---------- Dashboard ---------- */
 .dashboard-grid {
@@ -449,3 +459,11 @@ body {
 input[type="number"], input[type="text"], select {
   scroll-behavior: auto;
 }
+
+/* Return badge styles */
+.return-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+}
+.return-badge.PARTIAL_RETURN { background: rgba(224,166,68,.15); color: var(--warning); }
+.return-badge.RETURNED     { background: rgba(229,83,75,.15);  color: var(--danger);  }

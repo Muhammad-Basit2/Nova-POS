@@ -246,7 +246,7 @@ async function printSupplierLedger(vendor, transactions, paperSize) {
           <tr><td>Total Payments:</td><td class="right">${fmt(totalCredit)} ${currencyLabel}</td></tr>
           <tr><td><strong>${Number(vendor.balance) < 0 ? 'Supplier Advance:' : 'Payable Balance:'}</strong></td><td class="right"><strong>${fmt(Math.abs(Number(vendor.balance) || 0))} ${currencyLabel}</strong></td></tr>
         </table>
-        <div class="footer">${footer}<br><small>Powered by Nova POS</small></div>
+        <div class="footer">${footer}<br><small>Powered by Basit </small></div>
       </body>
       </html>
     `);
