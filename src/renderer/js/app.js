@@ -85,15 +85,13 @@ export async function refreshInvoiceLogoData() {
  *  View Router
  * ============================================================ */
 const viewInitializers = {
-  purchases:  () => initPurchases.refresh?.(),
   dashboard:  () => initDashboard.refresh?.(),
   pos:        () => initPOS.refresh?.(),
   inventory:  () => initInventory.refresh?.(),
-  purchases:  () => initPurchases.refresh?.(),
-  suppliers:  () => initVendors.refresh?.(),
   sales:      () => initPOS.loadSalesHistory?.(),
   customers:  () => initCustomers.refresh?.(),
   suppliers:  () => initVendors.refresh?.(),
+  purchases:  () => initPurchases.refresh?.(),
   settings:   () => loadSettingsForm(),
 };
 
@@ -227,21 +225,21 @@ function initShortcuts() {
     switch (e.key) {
       case 'F1':
         e.preventDefault();
-        if (inPosView) { initPOS.focusBarcode?.(); } else { switchView('dashboard'); }
+        if (inPosView) { initPOS.focusBarcode?.(); } else { switchView('pos'); }
         break;
       case 'F2':
         e.preventDefault();
-        if (inPosView) { initPOS.focusAmountPaid?.(); } else { switchView('pos'); }
+        if (inPosView) { initPOS.focusAmountPaid?.(); } else { switchView('inventory'); }
         break;
       case 'F3':
         e.preventDefault();
-        if (inPosView) { initPOS.togglePaymentMethod?.(); } else { switchView('inventory'); }
+        if (inPosView) { initPOS.togglePaymentMethod?.(); } else { switchView('customers'); }
         break;
-      case 'F4': e.preventDefault(); switchView('purchases'); break;
-      case 'F5': e.preventDefault(); switchView('sales'); break;
-      case 'F6': e.preventDefault(); switchView('customers'); break;
+      case 'F4': e.preventDefault(); switchView('sales'); break;
+      case 'F5': e.preventDefault(); switchView('settings', 'backup'); break;
+      case 'F6': e.preventDefault(); switchView('purchases'); break;
       case 'F7': e.preventDefault(); switchView('suppliers'); break;
-      case 'F8': e.preventDefault(); switchView('settings', 'backup'); break;
+      case 'F8': e.preventDefault(); switchView('dashboard'); break;
       case 'F9':
         e.preventDefault();
         if (inPosView) { initPOS.completeSale?.(); }

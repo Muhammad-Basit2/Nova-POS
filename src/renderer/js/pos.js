@@ -1,5 +1,5 @@
 /* ============================================================
- *  Nova POS � POS Cashier Logic
+ *  Nova POS – POS Cashier Logic
  *  src/renderer/js/pos.js
  * ============================================================ */
 
@@ -1078,7 +1078,7 @@ async function completeSale() {
     items: cart,
     customer_id: customer_id || null,
     discount,
-    amount_paid: payment_method === "credit" ? 0 : paid,
+    amount_paid: paid,
     payment_method,
     notes,
   });
@@ -1141,7 +1141,7 @@ async function loadSalesHistory() {
       <td><span class="return-badge ${s.status === 'PARTIAL_RETURN' ? 'PARTIAL_RETURN' : s.status === 'RETURNED' ? 'RETURNED' : ''}">${s.status || 'PAID'}</span></td>
       <td>
         <button class="btn small-btn" data-view-sale="${s.id}">View</button>
-        ${(s.status === 'PAID' || s.status === 'PARTIAL_RETURN') ? `<button class="btn small-btn" style="color:var(--warning)" data-return-sale="${s.id}">🔄 Return</button>` : ''}
+        ${(s.status !== 'RETURNED') ? `<button class="btn small-btn" style="color:var(--warning)" data-return-sale="${s.id}">🔄 Return</button>` : ''}
       </td>
     `;
     body.appendChild(tr);
@@ -1204,7 +1204,7 @@ async function viewSale(id) {
     </div>
     <div class="modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px;">
       <button class="btn primary" id="printThermalBtn">🖨️ Thermal Print</button>
-      ${(sale.status === 'PAID' || sale.status === 'PARTIAL_RETURN') ? `<button class="btn" style="color:var(--warning)" id="returnItemsBtn">🔄 Return Items</button>` : ''}
+      ${(sale.status !== 'RETURNED') ? `<button class="btn" style="color:var(--warning)" id="returnItemsBtn">🔄 Return Items</button>` : ''}
       <button class="btn" id="closeSaleModal">Close</button>
     </div>
   `);

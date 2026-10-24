@@ -156,16 +156,17 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     const change   = Math.max(paid - total, 0);
 
     let status = 'PAID';
-    if (remaining_balance > 0) {
-      status = paid > 0 ? 'PARTIAL' : 'UNPAID';
-    }
     if (payment_method === 'credit') {
-      status = 'CREDIT';
+      status = remaining_balance > 0 ? (paid > 0 ? 'PARTIAL_CREDIT' : 'CREDIT') : 'PAID';
+    } else {
+      if (remaining_balance > 0) {
+        status = paid > 0 ? 'PARTIAL' : 'UNPAID';
+      }
     }
 
     /* Generate invoice number */
     const prefix = db.prepare("SELECT value FROM settings WHERE key='invoice_prefix'").get()?.value || 'INV-';
-    const last   = db.prepare("SELECT COUNT(*) AS cnt FROM sales").get().cnt;
+    const last   = db.prepare("SELECT COALESCE(MAX(id), 0) AS max_id FROM sales").get().max_id;
     const invoice_no = `${prefix}${String(last + 1).padStart(6, '0')}`;
 
     const insertSale = db.prepare(`
@@ -195,11 +196,11 @@ function registerIpcHandlers(ipcMain, db, dialog) {
         });
         if (ci.item_id) updateStock.run(ci.quantity, ci.item_id);
       }
-      /* Update customer balance if credit */
+      /* Update customer balance if credit — add only the unpaid remaining balance */
       if (customer_id && payment_method === 'credit') {
-        db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(total, customer_id);
+        db.prepare('UPDATE customers SET balance = balance + ? WHERE id = ?').run(remaining_balance, customer_id);
         db.prepare(`INSERT INTO ledger_transactions (entity_type,entity_id,type,amount,description,reference)
-          VALUES ('customer',?,'debit',?,?,?)`).run(customer_id, total, `Sale ${invoice_no}`, invoice_no);
+          VALUES ('customer',?,'debit',?,?,?)`).run(customer_id, remaining_balance, `Sale ${invoice_no}`, invoice_no);
       }
       return saleId;
     });

@@ -1,15 +1,18 @@
 {
   "name": "nova-pos",
-  "version": "1.0.0",
-  "description": "Nova POS – Fast, offline Point of Sale & Inventory Management desktop application",
+  "version": "1.0.1",
+  "description": "Nova POS - Fast, offline Point of Sale & Inventory Management desktop application",
   "main": "src/main/main.js",
-  "author": "Nova POS Team",
+  "author": "Basit",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "npx electron-builder",
-    "dist": "npx electron-builder"
+    "dist": "npx electron-builder",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "rebuild": "npx electron-rebuild"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -19,6 +22,7 @@
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
     "icojs": "^1.0.1",
+    "jest": "^30.5.2",
     "sharp": "^0.35.5"
   },
   "build": {

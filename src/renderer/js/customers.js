@@ -214,7 +214,6 @@ async function showLedgerModal(customer) {
 }
 
 function clearUdhaarModal(customer) {
-  const today = new Date().toISOString().split('T')[0];
   openModal(`
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <h3 style="margin: 0;">Clear Udhaar</h3>
@@ -223,10 +222,6 @@ function clearUdhaarModal(customer) {
     <div style="margin-bottom: 12px; font-size: 14px;">
       <div>Customer: <strong>${customer.name}</strong></div>
       <div style="margin-top: 4px;">Current Udhaar: <strong style="color: var(--danger);">Rs. ${fmt(customer.balance)}</strong></div>
-    </div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-      <label style="font-size: 13px; color: var(--text-dim);">From<input type="date" class="input" id="clearFromDate" value="${today}" style="margin-top: 4px;" /></label>
-      <label style="font-size: 13px; color: var(--text-dim);">To<input type="date" class="input" id="clearToDate" value="${today}" style="margin-top: 4px;" /></label>
     </div>
     <label style="display: block; margin-bottom: 12px; font-size: 13px;">Received Amount (Rs.) *
       <input type="number" step="0.01" class="input" id="clearReceivedAmount" placeholder="0.00" value="${customer.balance > 0 ? customer.balance : ''}" style="margin-top: 4px;" />
