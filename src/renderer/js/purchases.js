@@ -45,6 +45,7 @@ async function refresh() {
       <td>
         ${canPay ? `<button class="btn success small-btn" data-pay="${purchase.id}">Record Payment</button>` : ''}
         ${purchase.vendor_id ? `<button class="btn small-btn" data-ledger="${purchase.vendor_id}">Supplier Ledger</button>` : ''}
+        <button class="btn danger small-btn" data-del="${purchase.id}">Delete</button>
       </td>
     `;
     body.appendChild(tr);
@@ -203,6 +204,19 @@ function init() {
         console.error('Could not load purchase for payment:', error);
         toast('Could not open purchase payment', true);
       }
+    }
+    const delId = Number(button.dataset.del);
+    if (delId) {
+      if (!confirm("Are you sure you want to delete this purchase? This will also remove all related ledger entries and reverse the supplier balance.")) return;
+      try {
+        await api.purchases.delete(delId);
+        toast("Purchase deleted");
+        await refresh();
+      } catch (error) {
+        console.error("Purchase deletion failed:", error);
+        toast(error.message || "Failed to delete purchase", true);
+      }
+      return;
     }
     const vendorId = Number(button.dataset.ledger);
     if (vendorId) {

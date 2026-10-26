@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
     getAll:        ()         => ipcRenderer.invoke('purchases:getAll'),
     create:        (data)     => ipcRenderer.invoke('purchases:create', data),
     recordPayment: (id, data) => ipcRenderer.invoke('purchases:recordPayment', id, data),
+    delete:        (id)       => ipcRenderer.invoke('purchases:delete', id),
   },
 
   /* ---- Customers ------------------------------------------- */

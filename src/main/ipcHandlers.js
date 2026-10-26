@@ -327,6 +327,26 @@ function registerIpcHandlers(ipcMain, db, dialog) {
       WHERE purchases.id = ?
     `).get(purchaseId);
   });
+  ipcMain.handle("purchases:delete", (_e, id) => {
+    const purchaseId = Number(id);
+    if (!Number.isInteger(purchaseId)) throw new Error("Invalid purchase ID");
+    const purchase = db.prepare("SELECT * FROM purchases WHERE id = ?").get(purchaseId);
+    if (!purchase) throw new Error("Purchase not found");
+    const { vendor_id, total_amount, paid_amount, invoice_no } = purchase;
+    const del = db.transaction(() => {
+      if (vendor_id) {
+        db.prepare(`
+          DELETE FROM ledger_transactions
+          WHERE entity_type = "vendor" AND entity_id = ? AND reference = ?
+        `).run(vendor_id, invoice_no);
+        const balanceDue = Math.max(total_amount - paid_amount, 0);
+        db.prepare("UPDATE vendors SET balance = balance - ? WHERE id = ?").run(balanceDue, vendor_id);
+      }
+      db.prepare("DELETE FROM purchases WHERE id = ?").run(purchaseId);
+    });
+    del();
+    return { success: true };
+  });
 
   /* ===========================================================
    *  CUSTOMERS
