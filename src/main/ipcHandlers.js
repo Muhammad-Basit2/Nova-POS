@@ -8,9 +8,100 @@
 
 const path = require('path');
 const fs   = require('fs');
-const { app } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const { getDbPath } = require('./database');
 const { parseItemsFromExcel, exportItemsToBuffer } = require('./excelHandler');
+const { printReceipt, PRINT_ERROR } = require('./printer');
+
+/* ============================================================
+ *  Helper functions for PDF generation
+ * ============================================================ */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fmt(n) {
+  return Number(n || 0).toFixed(2);
+}
+
+function buildPdfHtml({
+  storeName, storePhone, storeAddress, receiptFooter, curr, taxRate,
+  sale, itemsHtml, dateStr, timeStr, balanceDue, prevBal, logoHtml,
+}) {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice ${escapeHtml(sale.invoice_no || '')}</title>
+  <style>
+    @font-face { font-family: 'Gulzar'; src: url('file:///${path.join(__dirname, '..', '..', 'assets', 'fonts', 'Gulzar-Regular.ttf')}') format('truetype'); font-weight: 600; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #222; margin: 0; padding: 20px; background: #fff; }
+    .invoice { max-width: 700px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 16px; }
+    .header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 1px; }
+    .header p { margin: 2px 0; font-size: 11px; color: #555; }
+    .divider { border-top: 2px solid #333; margin: 12px 0; }
+    .meta-table { width: 100%; margin-bottom: 12px; font-size: 11px; }
+    .meta-table td { padding: 3px 0; vertical-align: top; }
+    .meta-table .label { font-weight: 600; width: 110px; }
+    .items-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .items-table th { background: #f0f0f0; padding: 7px 5px; text-align: left; font-weight: 600; border-bottom: 2px solid #999; }
+    .items-table th.r, .items-table td.r { text-align: right; }
+    .items-table th.c, .items-table td.c { text-align: center; }
+    .summary { width: 280px; margin-left: auto; margin-top: 12px; font-size: 11px; }
+    .summary td { padding: 4px 0; }
+    .summary .label { text-align: right; padding-right: 8px; }
+    .summary .val { text-align: right; font-weight: 600; }
+    .summary .grand { font-size: 13px; border-top: 2px solid #333; padding-top: 6px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #666; border-top: 1px dashed #ccc; padding-top: 12px; }
+    .urdu { font-family: 'Gulzar', serif; direction: rtl; font-size: 11px; color: #555; }
+  </style>
+</head>
+<body>
+<div class="invoice">
+  <div class="header">
+    <h1>${escapeHtml(storeName.toUpperCase())}</h1>
+    ${storeAddress ? `<p>${escapeHtml(storeAddress)}</p>` : ''}
+    ${storePhone ? `<p>Tel: ${escapeHtml(storePhone)}</p>` : ''}
+  </div>
+  ${logoHtml}
+  <div class="divider"></div>
+  <table class="meta-table">
+    <tr><td class="label">Invoice #:</td><td>${escapeHtml(String(sale.invoice_no || ''))}</td></tr>
+    <tr><td class="label">Date:</td><td>${escapeHtml(dateStr || '')}</td></tr>
+    <tr><td class="label">Time:</td><td>${escapeHtml(timeStr || '')}</td></tr>
+    <tr><td class="label">Customer:</td><td>${escapeHtml(sale.customer_name || 'Walk-in Customer')}</td></tr>
+    <tr><td class="label">Payment:</td><td>${escapeHtml(String(sale.payment_method || '').toUpperCase())}</td></tr>
+    <tr><td class="label">Status:</td><td>${escapeHtml(sale.status || 'PAID')}</td></tr>
+  </table>
+  <div class="divider"></div>
+  <table class="items-table">
+    <thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead>
+    <tbody>${itemsHtml}</tbody>
+  </table>
+  <table class="summary">
+    <tr><td class="label">Subtotal:</td><td class="val">${fmt(Number(sale.subtotal || 0))} ${escapeHtml(curr)}</td></tr>
+    ${taxRate > 0 ? `<tr><td class="label">Tax (${taxRate}%):</td><td class="val">${fmt(Number(sale.subtotal || 0) * taxRate / 100)} ${escapeHtml(curr)}</td></tr>` : ''}
+    ${Number(sale.discount || 0) > 0 ? `<tr><td class="label">Discount:</td><td class="val" style="color:#c00;">-${fmt(Number(sale.discount || 0))} ${escapeHtml(curr)}</td></tr>` : ''}
+    <tr><td class="label grand">GRAND TOTAL:</td><td class="val grand">${fmt(Number(sale.total || 0))} ${escapeHtml(curr)}</td></tr>
+    <tr><td class="label">Paid:</td><td class="val">${fmt(Number(sale.amount_paid || 0))} ${escapeHtml(curr)}</td></tr>
+    ${Number(sale.change_due || 0) > 0 ? `<tr><td class="label">Change:</td><td class="val">${fmt(Number(sale.change_due || 0))} ${escapeHtml(curr)}</td></tr>` : ''}
+    ${balanceDue > 0 ? `<tr><td class="label" style="color:#c00;font-weight:700;">Balance Due:</td><td class="val" style="color:#c00;font-weight:700;">${fmt(balanceDue)} ${escapeHtml(curr)}</td></tr>` : ''}
+    ${sale.customer_id ? `<tr><td class="label">Prev Balance:</td><td class="val">${fmt(prevBal)} ${escapeHtml(curr)}</td></tr><tr><td class="label">Updated Balance:</td><td class="val">${fmt(Number(sale.customer_balance || 0))} ${escapeHtml(curr)}</td></tr>` : ''}
+  </table>
+  <div class="divider"></div>
+  <div class="footer">
+    ${escapeHtml(receiptFooter)}<br>
+    ${storePhone ? `Tel: ${escapeHtml(storePhone)}<br>` : ''}
+    <span style="font-size:9px;color:#999;">Powered by Nova POS</span>
+  </div>
+</div>
+</body></html>`;
+  return html;
+}
 
 function registerIpcHandlers(ipcMain, db, dialog) {
 
@@ -770,6 +861,140 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     return { success: true };
   });
 
+  /* ===========================================================
+   *  THERMAL PRINTER (Direct Raw ESC/POS)
+   * =========================================================== */
+  ipcMain.handle('sales:printReceipt', async (_e, saleId) => {
+    const sale = db.prepare('SELECT s.*, c.name AS customer_name, c.balance AS customer_balance FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?').get(saleId);
+    if (!sale) throw new Error('Sale not found');
+    const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(saleId);
+    sale.items = items;
+
+    const settingsRows = db.prepare('SELECT key, value FROM settings').all();
+    const settings = Object.fromEntries(settingsRows.map(r => [r.key, r.value]));
+
+    const printerInterface = settings.printer_interface || 'printer:auto';
+    const printerWidth = parseInt(settings.thermal_width, 10) || 48;
+    const printerType = settings.printer_type || 'epson';
+
+    return await printReceipt(sale, settings, {
+      interface: printerInterface,
+      width: printerWidth,
+      type: printerType,
+    });
+  });
+
+  /* ===========================================================
+   *  SAVE INVOICE AS PDF
+   * =========================================================== */
+  ipcMain.handle('sales:savePdf', async (_e, saleId) => {
+    console.log('[PDF Main] savePdf handler called for saleId:', saleId);
+    try {
+      const sale = db.prepare('SELECT s.*, c.name AS customer_name, c.balance AS customer_balance FROM sales s LEFT JOIN customers c ON s.customer_id = c.id WHERE s.id = ?').get(saleId);
+      if (!sale) throw new Error('Sale not found');
+      const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(saleId);
+      sale.items = items;
+
+      const settingsRows = db.prepare('SELECT key, value FROM settings').all();
+      const settings = Object.fromEntries(settingsRows.map(r => [r.key, r.value]));
+
+      const storeName       = settings.store_name || 'Nova POS Store';
+      const storePhone      = settings.store_phone || '';
+      const storeAddress    = settings.store_address || '';
+      const receiptFooter   = settings.receipt_footer || 'Thank you for shopping with us!';
+      const curr            = settings.currency || 'PKR';
+      const taxRate         = parseFloat(settings.tax_rate || 0) || 0;
+      const logoDataUrl     = settings.logo_dataUrl || settings.logo_data_url || null;
+      const logoWidth       = parseInt(settings.logo_width, 10) || 120;
+      const logoHeight      = parseInt(settings.logo_height, 10) || 50;
+      const logoAlign       = settings.logo_alignment || 'center';
+
+      const itemsHtml = items.map(i => {
+        const name = escapeHtml(String(i.item_name || ''));
+        const urdu = i.urdu_name ? `<br><span style="font-family:'Gulzar',serif;font-size:11px;direction:rtl;color:#555;">${escapeHtml(i.urdu_name)}</span>` : '';
+        const qty  = `${i.quantity}${i.unit ? ' ' + escapeHtml(i.unit) : ''}`;
+        return `<tr>
+          <td style="padding:6px 5px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top;">${name}${urdu}</td>
+          <td style="padding:6px 5px;border-bottom:1px solid #ddd;text-align:center;">${qty}</td>
+          <td style="padding:6px 5px;border-bottom:1px solid #ddd;text-align:right;">${fmt(Number(i.unit_price || 0))}</td>
+          <td style="padding:6px 5px;border-bottom:1px solid #ddd;text-align:right;font-weight:600;">${fmt(Number(i.line_total || 0))}</td>
+        </tr>`;
+      }).join('');
+
+      const [dateStr, timeStr] = (sale.created_at || '').split(' ');
+      const balanceDue = Math.max(Number(sale.total || 0) - Number(sale.amount_paid || 0), 0);
+      const prevBal = sale.customer_id ? Math.max((sale.customer_balance || 0) - balanceDue, 0) : 0;
+
+      let logoHtml = '';
+      if (logoDataUrl) {
+        const alignStyle = logoAlign === 'left' ? 'text-align:left;' : logoAlign === 'right' ? 'text-align:right;' : 'text-align:center;';
+        logoHtml = `<div style="${alignStyle}margin:6px 0;"><img src="${logoDataUrl}" style="max-width:${logoWidth}px;height:${logoHeight}px;object-fit:contain;" /></div>`;
+      }
+
+      const html = buildPdfHtml({
+        storeName, storePhone, storeAddress, receiptFooter, curr, taxRate,
+        sale, itemsHtml, dateStr, timeStr, balanceDue, prevBal, logoHtml,
+      });
+
+      const win = new BrowserWindow({
+        width: 800, height: 1000, show: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
+      });
+
+      console.log('[PDF Main] Creating window and loading HTML...');
+
+      // Set up event listeners BEFORE loading
+      const loadPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('PDF generation timed out after 30 seconds')), 30000);
+        win.webContents.on('did-finish-load', () => { clearTimeout(timeout); resolve(); });
+        win.webContents.on('did-fail-load', (event, errorCode, errorDesc) => {
+          clearTimeout(timeout);
+          reject(new Error(`Load failed: ${errorCode} ${errorDesc}`));
+        });
+        win.webContents.on('print-to-pdf-success', (event, outputPath) => {
+          clearTimeout(timeout);
+          resolve(outputPath);
+        });
+        win.webContents.on('print-to-pdf-error', (event, error) => {
+          clearTimeout(timeout);
+          reject(new Error(`Print to PDF error: ${error}`));
+        });
+      });
+
+      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      await loadPromise;
+
+      console.log('[PDF Main] HTML loaded, generating PDF...');
+
+      const pdfBuffer = await win.webContents.printToPDF({
+        pageSize: 'A4',
+        margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 },
+        printBackground: true,
+      });
+
+      console.log('[PDF Main] PDF generated, showing save dialog...');
+
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Save Invoice as PDF',
+        defaultPath: `Invoice_${sale.invoice_no || sale.id}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+
+      console.log('[PDF Main] Save dialog result:', { canceled, filePath });
+
+      if (!canceled && filePath) {
+        fs.writeFileSync(filePath, pdfBuffer);
+        console.log('[PDF Main] PDF saved to:', filePath);
+        return { success: true, path: filePath };
+      }
+      return { success: false, error: 'Cancelled' };
+    } catch (err) {
+      console.error('[PDF Main] Error:', err);
+      throw err;
+    } finally {
+      if (win) win.close();
+    }
+  });
   /* ===========================================================
    *  SETTINGS
    * =========================================================== */

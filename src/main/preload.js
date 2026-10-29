@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
     getItems:     (saleId)   => ipcRenderer.invoke('sales:getItems', saleId),
     createReturn: (data)     => ipcRenderer.invoke('sales:createReturn', data),
     getReturns:   (saleId)   => ipcRenderer.invoke('sales:getReturns', saleId),
+    savePdf:      (saleId)   => ipcRenderer.invoke('sales:savePdf', saleId),
   },
 
   /* ---- Stock Purchases ------------------------------------- */
@@ -106,5 +107,10 @@ contextBridge.exposeInMainWorld('novaAPI', {
     get:      (key)       => ipcRenderer.invoke('settings:get', key),
     set:      (key, val)  => ipcRenderer.invoke('settings:set', key, val),
     getAll:   ()          => ipcRenderer.invoke('settings:getAll'),
+  },
+
+  /* ---- Thermal Receipt Printer ----------------------------- */
+  printer: {
+    printReceipt: (saleId) => ipcRenderer.invoke('sales:printReceipt', saleId),
   },
 });

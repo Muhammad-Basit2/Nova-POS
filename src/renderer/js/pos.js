@@ -356,213 +356,43 @@ async function tryBarcodeSubmit(barcode) {
   focusBarcode();
 }
 
-async function printThermalReceipt(saleId) {
+async function saveSalePdf(saleId) {
+  console.log('[PDF] saveSalePdf called with saleId:', saleId);
   try {
-    const sale = await api.sales.getById(saleId);
-    const items = await api.sales.getItems(saleId);
-    const allSettings = await api.settings.getAll();
-
-    const storeName = allSettings.store_name || "Nova POS Store";
-    const storePhone = allSettings.store_phone || "";
-    const storeAddress = allSettings.store_address || "";
-    const receiptFooter =
-      allSettings.receipt_footer || "Thank you for shopping with us!";
-    const curr = allSettings.currency || "";
-
-    let custDisplay = sale.customer_name;
-    if (!custDisplay) {
-      if (sale.notes && sale.notes.startsWith("Walk-in:")) {
-        custDisplay = sale.notes;
-      } else {
-        custDisplay = "Walk-in Customer";
-      }
+    console.log('[PDF] calling api.sales.savePdf...');
+    const res = await api.sales.savePdf(saleId);
+    console.log('[PDF] response:', res);
+    if (res && res.success) {
+      toast("Invoice saved as PDF successfully!");
+    } else {
+      toast(res?.error || "Failed to save PDF", true);
     }
-
-    const itemsRows = items
-      .map(
-        (i) => `
-      <tr>
-        <td style="text-align:left; padding:2px 0;"><strong>${invoiceItemName(i)}</strong></td>
-        <td style="text-align:center; padding:2px 0;"></td>
-        <td style="text-align:right; padding:2px 0;"></td>
-        <td style="text-align:right; padding:2px 0;"></td>
-      </tr>
-      <tr>
-        <td style="text-align:left; padding-bottom:4px; color:#555;"></td>
-        <td style="text-align:center; padding-bottom:4px;">${i.quantity}${i.unit ? " " + i.unit : ""}</td>
-        <td style="text-align:right; padding-bottom:4px;">${fmt(i.unit_price)}</td>
-        <td style="text-align:right; padding-bottom:4px; font-weight:600;">${fmt(i.line_total)}</td>
-      </tr>
-    `,
-      )
-      .join("");
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Receipt ${sale.invoice_no}</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          ${invoiceFontStyles()}
-          body {
-            font-family: 'Roboto', sans-serif;
-            font-size: 16px;
-            width: 72mm;
-            margin: 0 auto;
-            padding: 3mm;
-            color: #000;
-            background: #fff;
-            line-height: 1.4;
-          }
-          .center { text-align: center; }
-          .right { text-align: right; }
-          .bold { font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 7px 0; }
-          table { width: 100%; border-collapse: collapse; }
-          td { font-size: 13px; }
-          .totals-table td { padding: 2px 0; }
-          .footer { margin-top: 10px; text-align: center; font-size: 11px; }
-          th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
-          .item-total { font-weight: bold; }
-          .meta-label { font-weight: bold; }
-          .section-title { text-align: center; font-size: 17px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; }
-          .store-name { font-size: 19px; font-weight: 800; margin-bottom: 2px; letter-spacing: .5px; }
-          .store-meta { font-size: 12px; }
-          .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
-          .divider-thin { border-top: 1px solid #000; margin-top: -5px; margin-bottom: 8px; }
-          .total-row { font-size: 15px; font-weight: 800; }
-          .balance-row { font-size: 13px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="center store-name">${storeName}</div>
-        ${printLogoHTML(null, 300)}
-        <div class="center store-meta">${[storeAddress, storePhone ? "Tel: " + storePhone : null].filter(Boolean).join(", ")}</div>
-
-        <div class="divider-thick"></div>
-        <div class="divider-thin"></div>
-
-        <div class="section-title">RECEIPT</div>
-        <div><span class="meta-label">Date:</span> ${sale.created_at}</div>
-        <div><span class="meta-label">Invoice:</span> ${sale.invoice_no}</div>
-        <div><span class="meta-label">Customer:</span> ${custDisplay}</div>
-        <div><span class="meta-label">Payment:</span> ${sale.payment_method.toUpperCase()}</div>
-
-        <div class="divider"></div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align:left; padding:2px 0;">Description</th>
-              <th style="text-align:center; padding:2px 0;">Qty</th>
-              <th style="text-align:right; padding:2px 0;">Price</th>
-              <th style="text-align:right; padding:2px 0;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsRows}
-          </tbody>
-        </table>
-
-        <div class="divider"></div>
-
-        <table class="totals-table">
-          <tr>
-            <td>Subtotal:</td>
-            <td class="right">${fmt(sale.subtotal)} ${curr}</td>
-          </tr>
-          ${
-            sale.discount > 0
-              ? `<tr>
-            <td>Discount:</td>
-            <td class="right">-${fmt(sale.discount)} ${curr}</td>
-          </tr>`
-              : `
-          <tr>
-            <td>Discount:</td>
-            <td class="right">0.00 ${curr}</td>
-          </tr>`
-          }
-          <tr class="total-row">
-            <td>TOTAL:</td>
-            <td class="right">${fmt(sale.total)} ${curr}</td>
-          </tr>
-          <tr>
-            <td>Amount Paid:</td>
-            <td class="right">${fmt(sale.amount_paid)} ${curr}</td>
-          </tr>
-          ${
-            Math.max(sale.total - sale.amount_paid, 0) > 0
-              ? `<tr class="bold">
-            <td>Balance Due:</td>
-            <td class="right">${fmt(Math.max(sale.total - sale.amount_paid, 0))} ${curr}</td>
-          </tr>`
-              : ""
-          }
-          ${
-            sale.change_due > 0
-              ? `<tr>
-            <td>Change Due:</td>
-            <td class="right">${fmt(sale.change_due)} ${curr}</td>
-          </tr>`
-              : ""
-          }
-          ${
-            sale.customer_id
-              ? `<tr>
-            <td>Prev Balance:</td>
-            <td class="right">${fmt(Math.max((sale.customer_balance || 0) - Math.max(sale.total - sale.amount_paid, 0), 0))} ${curr}</td>
-          </tr>
-          <tr class="bold">
-            <td>Updated Balance:</td>
-            <td class="right">${fmt(sale.customer_balance || 0)} ${curr}</td>
-          </tr>`
-              : ""
-          }
-        </table>
-
-        <div class="divider-thick"></div>
-        <div class="divider-thin"></div>
-
-        <div class="footer">
-          ${receiptFooter.toUpperCase()}<br>
-          ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : ""}
-          <br><span style="font-size: 10px; color: #111111;">Powered by Basit | 0340 1358760</span>
-        </div>
-      </body>
-      </html>
-    `;
-
-    let printFrame = document.getElementById("thermalPrintFrame");
-    if (!printFrame) {
-      printFrame = document.createElement("iframe");
-      printFrame.id = "thermalPrintFrame";
-      printFrame.style.cssText =
-        "position: fixed; width: 80mm; height: 100vh; border: none; left: -9999px; top: 0; opacity: 0; pointer-events: none;";
-      document.body.appendChild(printFrame);
-    }
-
-    const frameDoc = printFrame.contentWindow.document;
-    frameDoc.open();
-    frameDoc.write(html);
-    frameDoc.close();
-
-    setTimeout(async () => {
-      try {
-        await printFrame.contentDocument.fonts.ready;
-        printFrame.contentWindow.focus();
-        printFrame.contentWindow.print();
-      } catch (e) {
-        console.error("Print invocation error:", e);
-      }
-    }, 250);
   } catch (err) {
-    console.error("Thermal print failed:", err);
-    toast("Failed to print thermal receipt", true);
+    console.error("[PDF] error:", err);
+    toast("PDF save error: " + (err.message || err), true);
   }
 }
+
+async function printThermalReceipt(saleId) {
+  try {
+    const res = await api.printer.printReceipt(saleId);
+    if (res && res.success) {
+      toast("Receipt printed successfully via ESC/POS");
+    } else {
+      const code = res?.errorCode || 'unknown';
+      let msg = res?.error || "Failed to print thermal receipt";
+      if (code === 'printer_not_connected') msg = "Printer not connected. Check cable/network.";
+      else if (code === 'printer_paper_out') msg = "Printer out of paper or cover open.";
+      else if (code === 'printer_not_configured') msg = "No printer interface configured in settings.";
+      toast(msg, true);
+    }
+  } catch (err) {
+    console.error("Thermal print error:", err);
+    toast("Thermal print error: " + (err.message || err), true);
+  }
+}
+
+
 
 function getCartContext() {
   const subtotal = cart.reduce((s, ci) => s + ci.line_total, 0);
@@ -1095,6 +925,7 @@ async function completeSale() {
         <p style="color: var(--text-dim); margin-bottom: 14px;">Invoice: <strong>${sale.invoice_no}</strong></p>
         <div style="display: flex; gap: 10px; justify-content: center;">
           <button class="btn primary" id="postPrintThermalBtn">🖨️ Print Thermal Receipt</button>
+          <button class="btn" id="postSavePdfBtn">📄 Save as PDF</button>
           <button class="btn" id="postCloseModal">Done / New Sale</button>
         </div>
       </div>
@@ -1108,6 +939,9 @@ async function completeSale() {
         printThermalReceipt(sale.id);
         closeModal();
       });
+    document
+      .getElementById("postSavePdfBtn")
+      .addEventListener("click", () => saveSalePdf(sale.id));
   } else {
     toast("Failed to record sale", true);
   }
@@ -1141,6 +975,7 @@ async function loadSalesHistory() {
       <td><span class="return-badge ${s.status === 'PARTIAL_RETURN' ? 'PARTIAL_RETURN' : s.status === 'RETURNED' ? 'RETURNED' : ''}">${s.status || 'PAID'}</span></td>
       <td>
         <button class="btn small-btn" data-view-sale="${s.id}">View</button>
+        <button class="btn small-btn" style="color:var(--accent)" data-pdf-sale="${s.id}">📄 PDF</button>
         ${(s.status !== 'RETURNED') ? `<button class="btn small-btn" style="color:var(--warning)" data-return-sale="${s.id}">🔄 Return</button>` : ''}
       </td>
     `;
@@ -1678,9 +1513,13 @@ function init() {
   $("#salesFilterBtn").addEventListener("click", loadSalesHistory);
   $("#salesRefreshBtn").addEventListener("click", loadSalesHistory);
   $("#salesBody").addEventListener("click", (e) => {
-    const id = e.target.dataset.viewSale;
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = btn.dataset.viewSale;
     if (id) { viewSale(Number(id)); return; }
-    const retId = e.target.dataset.returnSale;
+    const pdfId = btn.dataset.pdfSale;
+    if (pdfId) { console.log("[PDF] pdfSale clicked:", pdfId); saveSalePdf(Number(pdfId)); return; }
+    const retId = btn.dataset.returnSale;
     if (retId) openReturnModalForSale(Number(retId));
   });
 
