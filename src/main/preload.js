@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
     list:     ()         => ipcRenderer.invoke('backup:list'),
     export:   (filePath) => ipcRenderer.invoke('backup:export', filePath),
     import:   ()         => ipcRenderer.invoke('backup:import'),
+    delete:   (filePath) => ipcRenderer.invoke('backup:delete', filePath),
   },
 
   /* ---- Data Management --------------------------------------- */

@@ -624,6 +624,21 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     }
   });
 
+  ipcMain.handle('backup:delete', async (_e, filePath) => {
+    if (!filePath) return { success: false, message: 'No backup file specified' };
+    const backupDir = path.join(app.getPath('userData'), 'backups');
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(path.resolve(backupDir)) || !fs.existsSync(resolvedPath)) {
+      return { success: false, message: 'Invalid backup file path' };
+    }
+    try {
+      fs.unlinkSync(resolvedPath);
+      return { success: true, message: 'Backup deleted successfully' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  });
+
   /* ===========================================================
    *  DATA MANAGEMENT / CLEANUP
    * =========================================================== */

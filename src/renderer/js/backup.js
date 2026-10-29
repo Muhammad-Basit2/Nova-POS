@@ -25,6 +25,7 @@ async function refresh() {
         <div style="display: flex; gap: 4px;">
           <button class="btn small warning" data-restore-path="${b.path}">♻️ Restore</button>
           <button class="btn small" data-export-path="${b.path}">📤 Export</button>
+          <button class="btn small danger" data-delete-path="${b.path}">🗑️ Remove</button>
         </div>
       </td>
     `;
@@ -75,6 +76,21 @@ async function importBackup() {
   }
 }
 
+async function deleteBackup(filePath) {
+  if (!filePath) {
+    toast('Please select a backup from the list to delete', true);
+    return;
+  }
+  if (!confirm('Are you sure you want to delete this backup?')) return;
+  const res = await api.backup.delete(filePath);
+  if (res.success) {
+    toast(res.message);
+    refresh();
+  } else {
+    toast(`Delete failed: ${res.message}`, true);
+  }
+}
+
 function init() {
   $('#backupCreateBtn')?.addEventListener('click', createBackup);
   $('#backupRestoreBtn')?.addEventListener('click', () => restoreBackup());
@@ -82,8 +98,10 @@ function init() {
   $('#backupTable')?.addEventListener('click', (e) => {
     const restorePath = e.target.dataset.restorePath;
     const exportPath = e.target.dataset.exportPath;
+    const deletePath = e.target.dataset.deletePath;
     if (restorePath) restoreBackup(restorePath);
     if (exportPath) exportBackup(exportPath);
+    if (deletePath) deleteBackup(deletePath);
   });
   refresh();
 }
