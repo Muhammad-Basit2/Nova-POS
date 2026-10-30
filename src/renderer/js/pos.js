@@ -375,20 +375,118 @@ async function saveSalePdf(saleId) {
 
 async function printThermalReceipt(saleId) {
   try {
-    const res = await api.printer.printReceipt(saleId);
-    if (res && res.success) {
-      toast("Receipt printed successfully via ESC/POS");
-    } else {
-      const code = res?.errorCode || 'unknown';
-      let msg = res?.error || "Failed to print thermal receipt";
-      if (code === 'printer_not_connected') msg = "Printer not connected. Check cable/network.";
-      else if (code === 'printer_paper_out') msg = "Printer out of paper or cover open.";
-      else if (code === 'printer_not_configured') msg = "No printer interface configured in settings.";
-      toast(msg, true);
-    }
+    const sale = await api.sales.getById(saleId);
+    const items = await api.sales.getItems(saleId);
+    sale.items = items;
+    await printSaleHtml(sale);
   } catch (err) {
     console.error("Thermal print error:", err);
     toast("Thermal print error: " + (err.message || err), true);
+  }
+}
+
+async function printSaleHtml(sale) {
+  try {
+    const allSettings = await api.settings.getAll();
+    const storeName = allSettings.store_name || "Nova POS Store";
+    const storePhone = allSettings.store_phone || "";
+    const storeAddress = allSettings.store_address || "";
+    const receiptFooter = allSettings.receipt_footer || "Thank you for shopping with us!";
+    const curr = allSettings.currency || "";
+
+    const itemsRows = (sale.items || []).map((i) => `
+      <tr>
+        <td style="text-align:left; padding:2px 0;"><strong>${escapeHtml(i.item_name)}${i.urdu_name ? `<br><span class="urdu-item-name" lang="ur" dir="rtl">${escapeHtml(i.urdu_name)}</span>` : ""}</strong></td>
+        <td style="text-align:center; padding:2px 0;"></td>
+        <td style="text-align:right; padding:2px 0;"></td>
+      </tr>
+      <tr>
+        <td style="text-align:left; padding-bottom:4px; color:#555;"></td>
+        <td style="text-align:center; padding-bottom:4px;">${i.quantity}${i.unit ? " " + escapeHtml(i.unit) : ""}</td>
+        <td style="text-align:right; padding-bottom:4px; font-weight:600;">${fmt(i.line_total)}</td>
+      </tr>
+    `).join("");
+
+    const balDue = Number(sale.balance_due) || Math.max(Number(sale.total) - Number(sale.amount_paid), 0);
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Receipt ${escapeHtml(sale.invoice_no || '')}</title>
+<style>
+@page{size:80mm auto;margin:0}
+${invoiceFontStyles()}
+body{font-family:'Roboto',sans-serif;font-size:16px;width:72mm;margin:0 auto;padding:3mm;color:#000;background:#fff;line-height:1.4}
+.center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
+.divider{border-top:1px dashed #000;margin:7px 0}
+table{width:100%;border-collapse:collapse}
+td{font-size:13px}.totals-table td{padding:2px 0}
+.footer{margin-top:14px;padding-top:10px;border-top:1px dashed #999;text-align:center;font-size:11px;line-height:1.5}
+.powered-by{display:inline-block;margin-top:6px;padding-top:5px;border-top:1px solid #999;font-size:12px;color:#333;font-weight:700;letter-spacing:.3px}
+th{font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.meta-label{font-weight:bold}
+.store-name{font-size:19px;font-weight:800;margin-bottom:2px;letter-spacing:.5px}
+.store-meta{font-size:12px}
+.divider-thick{border-top:2px solid #000;margin:8px 0}
+.divider-thin{border-top:1px solid #000;margin-top:-5px;margin-bottom:8px}
+.total-row{font-size:15px;font-weight:800}
+.balance-row{font-size:13px;font-weight:bold}
+</style></head>
+<body>
+<div class="center store-name">${escapeHtml(storeName)}</div>
+${printLogoHTML(null, 300)}
+${storeAddress || storePhone ? `<div class="center store-meta">${[escapeHtml(storeAddress), storePhone ? "Tel: " + escapeHtml(storePhone) : null].filter(Boolean).join(", ")}</div>` : ""}
+<div class="divider-thick"></div><div class="divider-thin"></div>
+<div><span class="meta-label">Invoice #:</span> ${escapeHtml(sale.invoice_no || '')}</div>
+<div><span class="meta-label">Date:</span> ${escapeHtml(sale.created_at || '')}</div>
+<div><span class="meta-label">Customer:</span> ${escapeHtml(sale.customer_name || 'Walk-in Customer')}</div>
+<div><span class="meta-label">Payment:</span> ${(sale.payment_method || 'cash').toUpperCase()}</div>
+<div class="divider"></div>
+<table>
+<thead><tr>
+<th style="text-align:left;padding:2px 0;width:45%">Description</th>
+<th style="text-align:center;padding:2px 0;width:15%">Qty</th>
+<th style="text-align:right;padding:2px 0;width:40%">Total</th>
+</tr></thead>
+<tbody>${itemsRows}</tbody>
+</table>
+<div class="divider"></div>
+<table class="totals-table">
+<tr><td>Subtotal:</td><td class="right">${fmt(sale.subtotal)} ${curr}</td></tr>
+${sale.discount > 0 ? `<tr><td>Discount:</td><td class="right">-${fmt(sale.discount)} ${curr}</td></tr>` : `<tr><td>Discount:</td><td class="right">0.00 ${curr}</td></tr>`}
+<tr class="total-row"><td>TOTAL:</td><td class="right">${fmt(sale.total)} ${curr}</td></tr>
+<tr><td>Amount Paid:</td><td class="right">${fmt(sale.amount_paid)} ${curr}</td></tr>
+${balDue > 0 ? `<tr class="balance-row"><td>Balance Due:</td><td class="right">${fmt(balDue)} ${curr}</td></tr>` : ""}
+${sale.change_due > 0 ? `<tr><td>Change Due:</td><td class="right">${fmt(sale.change_due)} ${curr}</td></tr>` : ""}
+${sale.customer_id ? `<tr><td>Prev Balance:</td><td class="right">${fmt(sale.prev_balance)} ${curr}</td></tr><tr class="bold"><td>Updated Balance:</td><td class="right">${fmt(sale.customer_balance)} ${curr}</td></tr>` : ""}
+</table>
+<div class="divider-thick"></div><div class="divider-thin"></div>
+<div class="footer">
+${escapeHtml(receiptFooter.toUpperCase())}<br>
+${storePhone ? `<div style="font-size:11px;">Visit again! Tel: ${escapeHtml(storePhone)}</div>` : ""}
+<span class="powered-by">Powered by Basit | 0340 1358760</span>
+</div>
+</body></html>`;
+
+    let printFrame = document.getElementById("thermalPrintFrame");
+    if (!printFrame) {
+      printFrame = document.createElement("iframe");
+      printFrame.id = "thermalPrintFrame";
+      printFrame.style.cssText = "position:fixed;width:80mm;height:100vh;border:none;left:-9999px;top:0;opacity:0;pointer-events:none;";
+      document.body.appendChild(printFrame);
+    }
+    const frameDoc = printFrame.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(html);
+    frameDoc.close();
+    setTimeout(async () => {
+      try {
+        await printFrame.contentDocument.fonts.ready;
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (e) { console.error("Print invocation error:", e); }
+    }, 250);
+  } catch (err) {
+    console.error("Thermal print failed:", err);
+    toast("Failed to print thermal receipt", true);
   }
 }
 
@@ -499,7 +597,8 @@ async function printCartThermalReceipt() {
           table { width: 100%; border-collapse: collapse; }
           td { font-size: 13px; }
           .totals-table td { padding: 2px 0; }
-          .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+          .footer { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #999; text-align: center; font-size: 11px; line-height: 1.5; }
+          .powered-by { display: inline-block; margin-top: 6px; padding-top: 5px; border-top: 1px solid #999; font-size: 12px; color: #333; font-weight: 700; letter-spacing: .3px; }
           th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
           .item-total { font-weight: bold; }
           .meta-label { font-weight: bold; }
@@ -608,7 +707,7 @@ async function printCartThermalReceipt() {
         <div class="footer">
           ${receiptFooter.toUpperCase()}<br>
           ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : ""}
-          <br><span style="font-size: 10px; color: #555;">Powered by Basit | 0340 1358760</span>
+          <span class="powered-by">Powered by Basit | 0340 1358760</span>
         </div>
       </body>
       </html>
@@ -699,7 +798,8 @@ async function previewCartInvoice() {
         table { width: 100%; border-collapse: collapse; }
         td { font-size: 13px; }
         .totals-table td { padding: 2px 0; }
-        .footer { margin-top: 10px; text-align: center; font-size: 11px; }
+        .footer { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #999; text-align: center; font-size: 11px; line-height: 1.5; }
+        .powered-by { display: inline-block; margin-top: 6px; padding-top: 5px; border-top: 1px solid #999; font-size: 12px; color: #333; font-weight: 700; letter-spacing: .3px; }
         th { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
         .item-total { font-weight: bold; }
         .meta-label { font-weight: bold; }
@@ -798,7 +898,7 @@ async function previewCartInvoice() {
       <div class="footer">
         ${receiptFooter.toUpperCase()}<br>
         ${storePhone ? `<div style="font-size: 11px;">Visit again! Tel: ${storePhone}</div>` : ""}
-        <br><span style="font-size: 12px; font-weight: bold; color: #000000;">Powered by Basit | 0340 1358760</span>
+        <span class="powered-by">Powered by Basit | 0340 1358760</span>
       </div>
     </body>
     </html>
@@ -1594,5 +1694,3 @@ export const initPOS = {
   togglePaymentMethod,
   loadSalesHistory,
 };
-
-

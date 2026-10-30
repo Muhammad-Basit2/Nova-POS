@@ -273,6 +273,7 @@
           <button class="settings-tab active" data-settings-tab="general">⚙️ Store Settings</button>
           <button class="settings-tab" data-settings-tab="backup">💾 Backup & Restore</button>
           <button class="settings-tab" data-settings-tab="data">🗑️ Data Management</button>
+          <button class=\"settings-tab\" data-settings-tab=\"printer\">🖨️ Thermal Printer</button>
         </div>
         <div class="settings-panels">
           <div class="settings-panel active" id="settings-panel-general">
@@ -305,6 +306,37 @@
                 <option value="right">Right</option>
               </select></label>
             </div>
+          <div class=\"settings-panel hidden\" id=\"settings-panel-printer\">
+            <div class=\"settings-form card\">
+              <h3>Thermal Printer Settings</h3>
+              <p style=\"font-size:13px;color:var(--text-dim);margin-bottom:14px;\">
+                Configure direct ESC/POS thermal printing (bypasses Windows print spooler for instant receipt printing & auto-cut).
+              </p>
+              <label>Printer Interface / Connection
+                <input class=\"input\" data-setting=\"printer_interface\" placeholder=\"e.g. printer:EPSON TM-T88V, tcp://192.168.1.100, or printer:auto\" />
+                <span style=\"display:block;font-size:11px;color:var(--text-dim);margin-top:2px;\">
+                  Use <code>printer:Your Printer Name</code> (exact Windows printer name), <code>printer:auto</code>, or IP address like <code>tcp://192.168.1.100</code>.
+                </span>
+              </label>
+              <label>Printer Type
+                <select class=\"input\" data-setting=\"printer_type\">
+                  <option value=\"epson\">Epson</option>
+                  <option value=\"star\">Star</option>
+                  <option value=\"tanca\">Tanca</option>
+                  <option value=\"daruma\">Daruma</option>
+                  <option value=\"brother\">Brother</option>
+                  <option value=\"custom\">Custom</option>
+                </select>
+              </label>
+              <label>Characters Per Line (Width)
+                <input class=\"input\" type=\"number\" data-setting=\"thermal_width\" placeholder=\"48\" />
+                <span style=\"display:block;font-size:11px;color:var(--text-dim);margin-top:2px;\">
+                  Typically 42 for 58mm paper or 48 for 80mm paper.
+                </span>
+              </label>
+              <button id=\"savePrinterSettingsBtn\" class=\"btn primary block\" style=\"margin-top:16px;\">💾 Save Printer Settings</button>
+            </div>
+          </div>
           </div>
           <div class="settings-panel hidden" id="settings-panel-backup">
             <div class="backup-actions card">

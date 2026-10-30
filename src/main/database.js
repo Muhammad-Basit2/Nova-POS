@@ -213,6 +213,8 @@ function seedDefaults(db) {
     logo_height: '50',
     logo_alignment: 'center',
     thermal_width: '80',
+    printer_interface: '',
+    printer_type: 'epson',
   };
   const upsert = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (@key, @value)');
   const insertMany = db.transaction((entries) => {

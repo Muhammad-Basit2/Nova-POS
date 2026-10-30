@@ -42,6 +42,7 @@ function createPrinterInstance(cfg) {
     type: cfg.type || PrinterTypes.EPSON,
     width: cfg.width || 48,
     interface: cfg.interface,
+    driver: cfg.driver,
     characterSet: CharacterSet.WPC1252,
     breakLine: BreakLine.WORD,
     removeSpecialCharacters: false,
@@ -181,7 +182,9 @@ async function printReceipt(saleData, settings, printerCfg) {
   if (storePhone) {
     printer.println(`Visit again! Tel: ${storePhone}`);
   }
-  printer.println('— Powered by Nova POS —');
+  printer.bold(true);
+  printer.println('Powered by Basit | 0340 1358760');
+  printer.bold(false);
   printer.newLine();
 
   // Auto cut

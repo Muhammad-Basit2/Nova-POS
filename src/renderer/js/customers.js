@@ -99,7 +99,8 @@ async function printDocument(title, content, paperSize, frameId) {
           th { border-bottom: 2px solid #000; }
           .summary { margin-top: 10px; }
           .summary td { border: 0; padding: 3px 2px; }
-          .footer { text-align: center; margin-top: 12px; }
+          .footer { text-align: center; margin-top: 16px; padding-top: 10px; border-top: 1px dashed #ccc; line-height: 1.6; }
+          .powered-by { display: inline-block; margin-top: 6px; padding: 4px 12px; border: 1px solid #ccc; border-radius: 12px; color: #333; font-size: 11px; font-weight: 700; letter-spacing: .3px; background: #f5f5f5; }
           ${thermal ? 'th, td { font-size: 10px; }' : ''}
         </style>
       </head>
@@ -109,7 +110,7 @@ async function printDocument(title, content, paperSize, frameId) {
         ${storeAddress ? `<div class="center">${storeAddress}</div>` : ''}
         ${storePhone ? `<div class="center">Tel: ${storePhone}</div>` : ''}
         ${bodyContent}
-        <div class="footer">${footer}<br><small>Powered by Nova POS</small></div>
+        <div class="footer">${footer}<br><span class="powered-by">Powered by Basit | 0340 1358760</span></div>
       </body>
       </html>
     `);

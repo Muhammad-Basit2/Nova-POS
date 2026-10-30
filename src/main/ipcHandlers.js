@@ -56,7 +56,8 @@ function buildPdfHtml({
     .summary .label { text-align: right; padding-right: 8px; }
     .summary .val { text-align: right; font-weight: 600; }
     .summary .grand { font-size: 13px; border-top: 2px solid #333; padding-top: 6px; }
-    .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #666; border-top: 1px dashed #ccc; padding-top: 12px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #666; border-top: 1px dashed #ccc; padding-top: 12px; line-height: 1.6; }
+    .powered-by { display: inline-block; margin-top: 6px; padding: 4px 12px; border: 1px solid #ccc; border-radius: 12px; color: #333; font-size: 11px; font-weight: 700; letter-spacing: .3px; background: #f5f5f5; }
     .urdu { font-family: 'Gulzar', serif; direction: rtl; font-size: 11px; color: #555; }
   </style>
 </head>
@@ -96,7 +97,7 @@ function buildPdfHtml({
   <div class="footer">
     ${escapeHtml(receiptFooter)}<br>
     ${storePhone ? `Tel: ${escapeHtml(storePhone)}<br>` : ''}
-    <span style="font-size:9px;color:#999;">Powered by Nova POS</span>
+    <span class="powered-by">Powered by Basit | 0340 1358760</span>
   </div>
 </div>
 </body></html>`;
@@ -877,10 +878,20 @@ function registerIpcHandlers(ipcMain, db, dialog) {
     const printerWidth = parseInt(settings.thermal_width, 10) || 48;
     const printerType = settings.printer_type || 'epson';
 
+    let printerDriver = undefined;
+    if (printerInterface.startsWith('printer:')) {
+      try {
+        printerDriver = require('printer');
+      } catch (e) {
+        console.warn('Native printer module not available:', e);
+      }
+    }
+
     return await printReceipt(sale, settings, {
       interface: printerInterface,
       width: printerWidth,
       type: printerType,
+      driver: printerDriver,
     });
   });
 
