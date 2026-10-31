@@ -257,6 +257,8 @@ async function boot() {
   initShortcuts();
 
   $('#saveSettingsBtn').addEventListener('click', saveSettings);
+  const savePrinterBtn = $('#savePrinterSettingsBtn');
+  if (savePrinterBtn) savePrinterBtn.addEventListener('click', saveSettings);
   const pickLogoBtn = $('#chooseLogoBtn');
   if (pickLogoBtn) pickLogoBtn.addEventListener('click', pickLogo);
   const removeLogoBtn = $('#removeLogoBtn');
